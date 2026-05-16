@@ -1,0 +1,350 @@
+# pyright: reportGeneralTypeIssues=false
+"""FastAPI backend.
+
+JSON endpoints reuse the existing `portfolio/` data layer. The frontend is a
+single Jinja2-rendered page powered by Tailwind + Alpine.js + ApexCharts.
+
+Run with:  uv run uvicorn api:app --reload --port 8000
+"""
+from __future__ import annotations
+
+from datetime import date, datetime
+from pathlib import Path
+from typing import Any
+
+import pandas as pd
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
+
+from portfolio import benchmark, cash, loader, performance, positions, prices, returns
+
+BASE_DIR = Path(__file__).resolve().parent
+app = FastAPI(title="Trade Republic Portfolio")
+app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
+templates = Jinja2Templates(directory=BASE_DIR / "templates")
+
+
+# ── Data cache: load CSV + prices once per export file ──────────────
+_cache: dict[str, Any] = {}
+
+
+def _state(export_name: str | None = None) -> dict[str, Any]:
+    exports = loader.list_exports()
+    if not exports:
+        raise HTTPException(404, "No CSV files in exports/")
+    if export_name:
+        chosen = next((p for p in exports if p.name == export_name), None)
+        if not chosen:
+            raise HTTPException(404, f"Export {export_name} not found")
+    else:
+        chosen = exports[0]
+
+    key = f"{chosen.name}-{chosen.stat().st_mtime}"
+    if key in _cache:
+        return _cache[key]
+
+    df = loader.load(chosen)
+    holdings, realized = positions.compute_holdings(df)
+    isins = list(holdings.keys())
+    live = prices.fetch_prices(isins)
+    perf = performance.performance_series(df)
+    summary = cash.summarize(df)
+
+    _cache.clear()
+    _cache[key] = {
+        "export": chosen,
+        "df": df,
+        "holdings": holdings,
+        "realized": realized,
+        "prices": live,
+        "perf": perf,
+        "summary": summary,
+        "exports": [p.name for p in exports],
+    }
+    return _cache[key]
+
+
+def _serialize_dates(records: list[dict]) -> list[dict]:
+    for r in records:
+        for k, v in list(r.items()):
+            if isinstance(v, (pd.Timestamp, datetime, date)):
+                r[k] = pd.Timestamp(v).strftime("%Y-%m-%d")
+            elif pd.isna(v) if not isinstance(v, (list, dict, str)) else False:
+                r[k] = None
+    return records
+
+
+# ── Routes ──────────────────────────────────────────────────────────
+@app.get("/", response_class=HTMLResponse)
+def index(request: Request):
+    return templates.TemplateResponse("index.html", {"request": request})
+
+
+@app.get("/api/exports")
+def list_export_files():
+    return {"exports": [p.name for p in loader.list_exports()]}
+
+
+@app.get("/api/summary")
+def get_summary(export: str | None = None):
+    s = _state(export)
+    holdings, summary, live, realized = s["holdings"], s["summary"], s["prices"], s["realized"]
+
+    market_value = sum(live.get(isin, 0) * h.shares for isin, h in holdings.items())
+    cost_basis = sum(h.cost_basis for h in holdings.values())
+    portfolio_value = market_value + summary.cash_balance
+    unrealized = market_value - cost_basis
+    realized_pnl = sum(r.pnl for r in realized)
+
+    # XIRR: every deposit out, every withdrawal in, current value as today's inflow
+    df = s["df"]
+    flows = []
+    for _, row in df[df["type"].isin(cash.DEPOSIT_TYPES)].iterrows():
+        if pd.notna(row["amount"]):
+            flows.append((row["date"].date(), -float(row["amount"])))
+    for _, row in df[df["type"].isin(cash.WITHDRAWAL_TYPES)].iterrows():
+        if pd.notna(row["amount"]):
+            flows.append((row["date"].date(), -float(row["amount"])))
+    flows.append((date.today(), portfolio_value))
+    flows.sort()
+    xirr_value = returns.xirr(flows)
+
+    # Total return %
+    total_return = (portfolio_value - summary.net_deposits) / summary.net_deposits if summary.net_deposits else 0
+
+    return {
+        "export": s["export"].name,
+        "portfolio_value": portfolio_value,
+        "market_value": market_value,
+        "cash_balance": summary.cash_balance,
+        "cost_basis": cost_basis,
+        "net_deposits": summary.net_deposits,
+        "deposits": summary.deposits,
+        "withdrawals": summary.withdrawals,
+        "unrealized_pnl": unrealized,
+        "unrealized_pct": (unrealized / cost_basis * 100) if cost_basis else 0,
+        "realized_pnl": realized_pnl,
+        "total_return": total_return,
+        "xirr": xirr_value,
+        "dividends": summary.dividends,
+        "interest": summary.interest,
+        "stockperks": summary.stockperks,
+        "fees": summary.fees,
+        "tax": summary.tax,
+        "n_holdings": len(holdings),
+        "n_realized": len(realized),
+        "first_trade_date": df.loc[df["category"] == "TRADING", "date"].min().strftime("%Y-%m-%d")
+        if not df[df["category"] == "TRADING"].empty
+        else None,
+    }
+
+
+@app.get("/api/holdings")
+def get_holdings(export: str | None = None):
+    s = _state(export)
+    holdings, live = s["holdings"], s["prices"]
+    total_mv = sum(live.get(isin, 0) * h.shares for isin, h in holdings.items())
+
+    rows = []
+    for h in holdings.values():
+        cur = live.get(h.isin)
+        market_value = (cur * h.shares) if cur else None
+        unrealized = (market_value - h.cost_basis) if market_value is not None else None
+        rows.append(
+            {
+                "isin": h.isin,
+                "name": h.name,
+                "asset_class": h.asset_class,
+                "shares": h.shares,
+                "avg_cost": h.avg_cost,
+                "cost_basis": h.cost_basis,
+                "current_price": cur,
+                "market_value": market_value,
+                "unrealized_pnl": unrealized,
+                "unrealized_pct": (unrealized / h.cost_basis * 100) if unrealized is not None and h.cost_basis else None,
+                "weight": (market_value / total_mv * 100) if market_value and total_mv else 0,
+                "fees_paid": h.fees_paid,
+            }
+        )
+    rows.sort(key=lambda r: -(r["market_value"] or 0))
+    return {"holdings": rows, "total_market_value": total_mv}
+
+
+@app.get("/api/performance")
+def get_performance(export: str | None = None, include_benchmark: bool = True):
+    s = _state(export)
+    perf = s["perf"]
+    if perf.empty:
+        return {"series": [], "drawdown": [], "twr": [], "benchmark": None}
+
+    series = [
+        {
+            "date": ts.strftime("%Y-%m-%d"),
+            "portfolio_value": float(perf.loc[ts, "portfolio_value"]) if "portfolio_value" in perf.columns else None,
+            "contributions": float(perf.loc[ts, "contributions"]) if "contributions" in perf.columns else None,
+            "holdings_value": float(perf.loc[ts, "holdings_value"]) if "holdings_value" in perf.columns else None,
+        }
+        for ts in perf.index
+    ]
+
+    pv = perf["portfolio_value"]
+    contrib = perf["contributions"]
+    dd = returns.drawdown(pv).fillna(0)
+    twr_series = returns.twr(pv, contrib)
+
+    drawdown_data = [{"date": ts.strftime("%Y-%m-%d"), "drawdown": float(dd.loc[ts]) * 100} for ts in dd.index]
+    twr_data = [{"date": ts.strftime("%Y-%m-%d"), "twr": (float(twr_series.loc[ts]) - 1) * 100} for ts in twr_series.index]
+
+    bench_payload = None
+    if include_benchmark:
+        bench_ticker = next(iter(benchmark.BENCHMARKS.values()))
+        bench_name = next(iter(benchmark.BENCHMARKS.keys()))
+        bench_prices = benchmark.benchmark_series(bench_ticker, perf.index.min(), perf.index.max())
+        if not bench_prices.empty:
+            # Daily contributions amount (positive deposit days)
+            df = s["df"]
+            deps = df[df["type"].isin(cash.DEPOSIT_TYPES + cash.WITHDRAWAL_TYPES)].copy()
+            deps["day"] = deps["date"].dt.normalize()
+            daily_deps = deps.groupby("day")["amount"].sum()
+            daily_deps = daily_deps.reindex(perf.index, fill_value=0)
+            hypo = benchmark.hypothetical_value(daily_deps, bench_prices)
+            bench_payload = {
+                "name": bench_name,
+                "series": [
+                    {"date": ts.strftime("%Y-%m-%d"), "value": float(hypo.loc[ts]) if ts in hypo.index else None}
+                    for ts in perf.index
+                ],
+            }
+
+    return {
+        "series": series,
+        "drawdown": drawdown_data,
+        "twr": twr_data,
+        "benchmark": bench_payload,
+        "best_worst": returns.best_worst_days(pv),
+    }
+
+
+@app.get("/api/cash_flow")
+def get_cash_flow(export: str | None = None):
+    s = _state(export)
+    df = s["df"]
+    summary = s["summary"]
+    bal = cash.cash_balance_over_time(df)
+    return {
+        "balance": [{"date": str(r["date"]), "cash": float(r["cash"])} for _, r in bal.iterrows()],
+        "buckets": [
+            {"label": "Deposits", "value": summary.deposits},
+            {"label": "Withdrawals", "value": -summary.withdrawals},
+            {"label": "Dividends", "value": summary.dividends},
+            {"label": "Interest", "value": summary.interest},
+            {"label": "Stock perks", "value": summary.stockperks},
+            {"label": "Fees", "value": -summary.fees},
+            {"label": "Tax", "value": -summary.tax},
+            {"label": "Net invested", "value": -summary.invested},
+        ],
+    }
+
+
+@app.get("/api/income")
+def get_income(export: str | None = None):
+    s = _state(export)
+    log = cash.income_log(s["df"])
+    records = _serialize_dates(log.to_dict(orient="records"))
+    return {"log": records, "totals": {
+        "dividends": s["summary"].dividends,
+        "interest": s["summary"].interest,
+        "stockperks": s["summary"].stockperks,
+    }}
+
+
+@app.get("/api/realized")
+def get_realized(export: str | None = None):
+    s = _state(export)
+    return {
+        "realized": [
+            {
+                "date": pd.Timestamp(r.date).strftime("%Y-%m-%d") if pd.notna(r.date) else None,
+                "name": r.name,
+                "isin": r.isin,
+                "shares": r.shares,
+                "sell_price": r.sell_price,
+                "avg_cost": r.avg_cost,
+                "pnl": r.pnl,
+                "pnl_pct": ((r.sell_price - r.avg_cost) / r.avg_cost * 100) if r.avg_cost else 0,
+            }
+            for r in s["realized"]
+        ],
+        "total": sum(r.pnl for r in s["realized"]),
+    }
+
+
+@app.get("/api/tax")
+def get_tax(export: str | None = None):
+    s = _state(export)
+    df = cash.tax_view(s["df"])
+    return {"records": _serialize_dates(df.to_dict(orient="records"))}
+
+
+@app.get("/api/asset/{isin}")
+def get_asset(isin: str, export: str | None = None):
+    s = _state(export)
+    df = s["df"]
+    subset = df[df["symbol"] == isin].copy()
+    if subset.empty:
+        raise HTTPException(404, f"No transactions for ISIN {isin}")
+    records = []
+    for _, row in subset.iterrows():
+        records.append(
+            {
+                "date": row["date"].strftime("%Y-%m-%d") if pd.notna(row["date"]) else None,
+                "type": row["type"],
+                "shares": float(row["shares"]) if pd.notna(row["shares"]) else None,
+                "price": float(row["price"]) if pd.notna(row["price"]) else None,
+                "amount": float(row["amount"]) if pd.notna(row["amount"]) else None,
+                "fee": float(row["fee"]) if pd.notna(row["fee"]) else None,
+                "tax": float(row["tax"]) if pd.notna(row["tax"]) else None,
+                "description": row["description"],
+            }
+        )
+
+    h = s["holdings"].get(isin)
+    current = s["prices"].get(isin)
+    return {
+        "isin": isin,
+        "name": subset.iloc[0]["name"],
+        "asset_class": subset.iloc[0]["asset_class"],
+        "transactions": records,
+        "current": {
+            "shares": h.shares if h else 0,
+            "avg_cost": h.avg_cost if h else 0,
+            "cost_basis": h.cost_basis if h else 0,
+            "current_price": current,
+            "market_value": (current * h.shares) if (h and current) else None,
+            "unrealized": ((current * h.shares) - h.cost_basis) if (h and current) else None,
+        },
+    }
+
+
+@app.get("/api/sparklines")
+def get_sparklines(export: str | None = None, days: int = 90):
+    """Per-holding price sparkline for the last N days."""
+    s = _state(export)
+    isins = list(s["holdings"].keys())
+    if not isins:
+        return {"sparklines": {}}
+
+    end = pd.Timestamp.now().normalize()
+    start = end - pd.Timedelta(days=days)
+    hist = performance._historical_prices(isins, start, end)
+    out: dict[str, list[float]] = {}
+    if hist.empty:
+        return {"sparklines": out}
+    for isin in isins:
+        if isin in hist.columns:
+            series = hist[isin].dropna().tolist()
+            if series:
+                out[isin] = [float(v) for v in series]
+    return {"sparklines": out}
