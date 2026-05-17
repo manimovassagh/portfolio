@@ -11,7 +11,9 @@ services:
     restart: unless-stopped
     ports:
       - "80:80"                     # HTTP → redirects to HTTPS
-      - "443:443"                   # HTTPS (self-signed cert for localhost)
+      - "443:443"                   # HTTPS
+    volumes:
+      - ./certs:/etc/nginx/ssl:ro   # mkcert trusted certs (run setup-certs.sh first)
     depends_on:
       - app
 
