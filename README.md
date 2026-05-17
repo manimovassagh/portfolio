@@ -1,59 +1,92 @@
-# Kapital Portfolio Dashboard
+# Kapital — Portfolio Analytics Dashboard
 
-Local FastAPI + React dashboard for portfolio CSV exports. The repo ships with a synthetic demo export in `exports/sample-portfolio.csv` for screenshots and videos.
+A self-hosted portfolio dashboard for Trade Republic CSV exports. Tracks holdings, performance, income, tax, and more in a clean React UI backed by a FastAPI data engine.
 
-## Run
+> **Demo data included** — the repo ships with a synthetic `exports/sample-portfolio.csv` so you can run it without connecting real account data.
+
+---
+
+## Tech stack
+
+| Layer | Tech |
+|---|---|
+| Backend | Python 3.12 · FastAPI · pandas · yfinance · SQLite |
+| Frontend | React 19 · TypeScript · Vite · Tailwind CSS · Recharts |
+| Package mgmt | uv (Python) · npm (Node) |
+
+---
+
+## Run locally
+
+**Prerequisites:** Python 3.12+, Node 20+, [uv](https://docs.astral.sh/uv/)
 
 ```bash
+# Install dependencies
 npm install
+uv sync
+
+# Build the frontend
 npm run build
+
+# Start the server
 uv run uvicorn api:app --port 8765
 ```
 
-Opens at <http://127.0.0.1:8765>.
+Open **http://127.0.0.1:8765** — the sample portfolio loads automatically.
 
-## How to use
+---
 
-1. Export transactions from the Trade Republic app: **Profile → Documents → Transaction history → Export**.
-2. Drop the CSV into `exports/`, or use the dashboard import control.
-3. Open the dashboard. The newest export is selected by default; old exports stay available in the file selector.
+## Import your own data
 
-## Tabs
+1. In the Trade Republic app: **Profile → Documents → Transaction history → Export**
+2. Drop the CSV into `exports/`, or use the **Import** button in the dashboard header
+3. The newest export is selected by default; older exports stay available in the file selector
 
-- **Overview** — headline numbers, rolling returns, performance chart, and movers.
-- **Analytics** — monthly returns, annual P&L, allocation, geographic exposure, unrealized P&L over time.
-- **Holdings** — current holdings with shares, avg cost, market value, unrealized P&L, TTM yield.
-- **Cash flow** — cash balance area chart + inflow/outflow waterfall.
-- **Income** — dividends, interest, stock perks log + dividend calendar.
-- **Realized P&L** — closed trades with per-trade P&L.
-- **Tax** — Vorabpauschale, withholding tax, capital gains tax; FSA (Freistellungsauftrag) tracker.
-- **Watchlist** — track assets with target prices; persisted in SQLite.
-- **Rebalance** — enter target weights, see buy/sell actions needed.
-- **Goals / FIRE** — FIRE number calculator, custom goal tracker, 10-year projection.
-- **Asset modal** — per-asset transaction history with position notes.
+---
 
-## Adding a new asset
+## Features
 
-If the dashboard can't find a price for an ISIN, it'll show a warning in the **Positions** tab. Two options:
+| Tab | What it shows |
+|---|---|
+| **Overview** | Portfolio value, TWR, XIRR, Sharpe ratio, rolling returns, performance chart, top movers |
+| **Analytics** | Monthly returns heatmap, annual P&L, allocation treemap, geographic exposure |
+| **Holdings** | Current positions — shares, avg cost, market value, unrealized P&L, TTM yield |
+| **Cash flow** | Cash balance area chart + inflow/outflow waterfall |
+| **Income** | Dividends, interest, stock perks log + dividend calendar |
+| **Realized P&L** | Closed trades with per-trade gain/loss |
+| **Tax** | Vorabpauschale, withholding tax, capital gains · FSA (Freistellungsauftrag) tracker |
+| **Watchlist** | Track assets with target prices — persisted in SQLite |
+| **Rebalance** | Enter target weights, see buy/sell amounts needed |
+| **Goals / FIRE** | FIRE number calculator, custom goal tracker, 10-year projection |
 
-1. **Auto-discovery** — the app already tries Yahoo's search endpoint. New tickers are cached to `cache/isin_to_ticker.json`.
-2. **Manual mapping** — edit `KNOWN_TICKERS` in `portfolio/prices.py` to force a specific Yahoo ticker.
+Click any holding to open a per-asset modal with full transaction history and position notes.
 
-Currency handling: USD-denominated tickers are FX-converted to EUR automatically using `USDEUR=X`.
+---
 
-## File layout
+## Adding an unlisted asset
+
+If the dashboard can't find a price for an ISIN it shows a warning in the Holdings tab.
+
+- **Auto-discovery** — the app queries Yahoo Finance automatically; new mappings are cached to `cache/isin_to_ticker.json`
+- **Manual override** — add the ISIN → ticker pair to `KNOWN_TICKERS` in `portfolio/prices.py`
+
+USD-denominated tickers are FX-converted to EUR automatically via `USDEUR=X`.
+
+---
+
+## Project layout
 
 ```
-├── api.py                    # FastAPI entry point (20 lines)
+├── api.py                    # FastAPI entry point (~20 lines)
 ├── app/
 │   ├── deps.py               # Shared state cache + helpers
 │   ├── schemas.py            # Pydantic response models
 │   └── routers/
 │       ├── core.py           # SPA index, export listing, CSV upload
 │       ├── portfolio.py      # Summary, holdings, performance, income…
-│       ├── analytics.py      # Analytics, geographic, FSA, dividends
+│       ├── analytics.py      # Analytics, geographic exposure, FSA, dividends
 │       └── watchlist.py      # Watchlist CRUD
-├── portfolio/                # Pure data layer
+├── portfolio/                # Pure data layer (no HTTP concerns)
 │   ├── loader.py             # CSV → DataFrame
 │   ├── positions.py          # Holdings & realized P&L (avg-cost basis)
 │   ├── cash.py               # Cash flow & income
@@ -63,13 +96,12 @@ Currency handling: USD-denominated tickers are FX-converted to EUR automatically
 │   ├── benchmark.py          # Benchmark comparison
 │   └── db.py                 # SQLite persistence (watchlist)
 ├── src/                      # React + TypeScript frontend
-│   ├── App.tsx               # Root: state, layout, routing
-│   ├── lib/                  # Pure utilities (format, chart theme)
+│   ├── App.tsx               # Root: state, layout, tab routing
+│   ├── lib/                  # Pure utilities (format, chart theme, sections)
 │   └── components/
-│       ├── ui/               # Card, MetricCard, InfoModal, …
+│       ├── ui/               # Card, MetricCard, ProgressBar, Skeleton…
 │       ├── charts/           # HeroChart, AllocationTreemap
 │       └── views/            # One file per tab
 ├── index.html                # Vite entry point
-├── exports/                  # Drop CSVs here
-└── portfolio.db              # SQLite database (watchlist)
+└── exports/                  # Drop CSV exports here
 ```
