@@ -271,6 +271,22 @@
             </template>
           </div>
 
+          <!-- Rolling returns strip -->
+          <div class="grid grid-cols-5 gap-2">
+            <template x-for="r in rollingReturns" :key="r.label">
+              <div class="card rounded-xl px-3 py-3 text-center flex flex-col items-center gap-1">
+                <div class="text-[9px] font-semibold uppercase tracking-widest text-ink-400 dark:text-ink-500" x-text="r.label"></div>
+                <div class="num text-base font-bold leading-none"
+                     :class="r.pct === null ? 'text-ink-400' : r.pct >= 0 ? 'text-emerald-500' : 'text-rose-500'"
+                     x-text="r.pct !== null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(2) + '%' : '—'"></div>
+                <div class="w-full h-0.5 rounded-full overflow-hidden bg-ink-200/50 dark:bg-ink-800/50">
+                  <div class="h-full rounded-full transition-all"
+                       :style="`width:${r.pct !== null ? Math.min(100, Math.abs(r.pct) * 4) : 0}%;background:${(r.pct ?? 0) >= 0 ? '#10b981' : '#f43f5e'}`"></div>
+                </div>
+              </div>
+            </template>
+          </div>
+
           <!-- Hero chart: portfolio vs benchmark -->
           <div class="card card-hero rounded-xl p-5">
             <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
@@ -326,6 +342,42 @@
                 </template>
                 <template x-if="!movers.length">
                   <div class="text-sm text-ink-500">No data yet.</div>
+                </template>
+              </div>
+            </div>
+          </div>
+
+          <!-- Best & worst days -->
+          <div x-show="perf?.best_worst?.best?.length" class="grid sm:grid-cols-2 gap-3">
+            <div class="card rounded-xl p-4">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center shrink-0">
+                  <i data-lucide="arrow-up" class="w-3.5 h-3.5 text-emerald-500 stroke-[2.5]"></i>
+                </div>
+                <div class="text-sm font-semibold tracking-tight">Best days</div>
+              </div>
+              <div class="space-y-2">
+                <template x-for="d in perf?.best_worst?.best" :key="d.date">
+                  <div class="flex items-center justify-between py-1 border-b border-ink-100/60 dark:border-ink-800/40 last:border-0">
+                    <div class="text-xs text-ink-500 dark:text-ink-400 font-mono" x-text="d.date"></div>
+                    <div class="num text-sm font-semibold text-emerald-500" x-text="'+' + fmtEUR(d.pnl)"></div>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div class="card rounded-xl p-4">
+              <div class="flex items-center gap-2 mb-3">
+                <div class="w-6 h-6 rounded-lg bg-rose-500/15 flex items-center justify-center shrink-0">
+                  <i data-lucide="arrow-down" class="w-3.5 h-3.5 text-rose-500 stroke-[2.5]"></i>
+                </div>
+                <div class="text-sm font-semibold tracking-tight">Worst days</div>
+              </div>
+              <div class="space-y-2">
+                <template x-for="d in perf?.best_worst?.worst" :key="d.date">
+                  <div class="flex items-center justify-between py-1 border-b border-ink-100/60 dark:border-ink-800/40 last:border-0">
+                    <div class="text-xs text-ink-500 dark:text-ink-400 font-mono" x-text="d.date"></div>
+                    <div class="num text-sm font-semibold text-rose-500" x-text="fmtEUR(d.pnl)"></div>
+                  </div>
                 </template>
               </div>
             </div>
@@ -410,12 +462,75 @@
               <h2 class="text-lg font-semibold tracking-tight">Holdings</h2>
               <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5" x-text="`${holdings.length} open positions · ${fmtEUR(totalMV)} market value`"></p>
             </div>
-            <button @click="rebalanceMode = !rebalanceMode"
-                    :class="rebalanceMode ? 'bg-emerald-500 text-white border-emerald-500' : 'border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-900'"
-                    class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors">
-              <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
-              Rebalance
-            </button>
+            <div class="flex items-center gap-2">
+              <button @click="taxHarvestMode = !taxHarvestMode; rebalanceMode = false"
+                      :class="taxHarvestMode ? 'bg-rose-500 text-white border-rose-500' : 'border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-900'"
+                      class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors">
+                <i data-lucide="leaf" class="w-3.5 h-3.5"></i>
+                Tax harvest
+              </button>
+              <button @click="rebalanceMode = !rebalanceMode; taxHarvestMode = false"
+                      :class="rebalanceMode ? 'bg-emerald-500 text-white border-emerald-500' : 'border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-900'"
+                      class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors">
+                <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i>
+                Rebalance
+              </button>
+            </div>
+          </div>
+
+          <!-- Tax loss harvesting panel -->
+          <div x-show="taxHarvestMode" x-transition class="card rounded-xl overflow-hidden">
+            <div class="px-4 py-3 border-b border-ink-200/40 dark:border-ink-800/40 flex items-center justify-between">
+              <div>
+                <span class="text-sm font-semibold">Tax loss harvesting</span>
+                <span class="ml-2 text-xs text-ink-500 dark:text-ink-400">Sell losers to offset gains — potential saving at 26.375% DE rate</span>
+              </div>
+              <div x-show="totalTaxSaving > 0" class="text-sm font-semibold text-emerald-500 num">
+                Save up to <span x-text="fmtEUR(totalTaxSaving)"></span>
+              </div>
+            </div>
+            <template x-if="!taxLossOpportunities.length">
+              <div class="px-4 py-8 text-center text-sm text-ink-500 dark:text-ink-400">
+                <i data-lucide="check-circle" class="w-8 h-8 mx-auto mb-2 text-emerald-500"></i>
+                All positions are in profit — nothing to harvest right now.
+              </div>
+            </template>
+            <template x-if="taxLossOpportunities.length">
+              <div>
+                <table class="w-full text-sm">
+                  <thead class="bg-ink-100/60 dark:bg-ink-900/40 text-[11px] uppercase tracking-wider text-ink-500 dark:text-ink-400">
+                    <tr>
+                      <th class="text-left font-medium px-4 py-2.5">Position</th>
+                      <th class="text-right font-medium px-3 py-2.5">Unrealized loss</th>
+                      <th class="text-right font-medium px-3 py-2.5">Loss %</th>
+                      <th class="text-right font-medium px-3 py-2.5">Market value</th>
+                      <th class="text-right font-medium px-4 py-2.5">Tax saved if sold</th>
+                    </tr>
+                  </thead>
+                  <tbody class="divide-y divide-ink-200/40 dark:divide-ink-800/40">
+                    <template x-for="h in taxLossOpportunities" :key="h.isin">
+                      <tr class="tr-hover cursor-pointer" @click="openAsset(h.isin)">
+                        <td class="px-4 py-2.5">
+                          <div class="font-medium truncate max-w-[220px]" x-text="h.name"></div>
+                          <div class="text-[10px] text-ink-500 font-mono" x-text="h.isin"></div>
+                        </td>
+                        <td class="num text-right px-3 py-2.5 font-semibold text-rose-500"
+                            x-text="fmtEUR(h.unrealized_pnl)"></td>
+                        <td class="num text-right px-3 py-2.5 text-xs text-rose-500"
+                            x-text="h.unrealized_pct !== null ? h.unrealized_pct.toFixed(2) + '%' : '—'"></td>
+                        <td class="num text-right px-3 py-2.5 text-ink-600 dark:text-ink-300"
+                            x-text="h.market_value !== null ? fmtEUR(h.market_value) : '—'"></td>
+                        <td class="num text-right px-4 py-2.5 font-semibold text-emerald-500"
+                            x-text="'+' + fmtEUR(h.taxSaving)"></td>
+                      </tr>
+                    </template>
+                  </tbody>
+                </table>
+                <div class="px-4 py-2.5 border-t border-ink-200/40 dark:border-ink-800/40 text-[10px] text-ink-400 dark:text-ink-500">
+                  Not financial advice. Consult a tax advisor. Wash-sale rules may apply.
+                </div>
+              </div>
+            </template>
           </div>
 
           <!-- Rebalancing table -->

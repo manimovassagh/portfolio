@@ -39,6 +39,7 @@ function dashboard() {
     analytics: null,
     rebalanceMode: false,
     rebalanceTargets: {},
+    taxHarvestMode: false,
 
     sections: [
       { id: 'overview',  label: 'Overview',     icon: 'layout-dashboard' },
@@ -257,6 +258,28 @@ function dashboard() {
         .sort((a, b) => Math.abs(b.unrealized_pnl) - Math.abs(a.unrealized_pnl))
         .slice(0, 6)
         .map(h => ({ isin: h.isin, name: h.name, pnl: h.unrealized_pnl, pct: h.unrealized_pct || 0 }));
+    },
+
+    get rollingReturns() {
+      const placeholder = ['1M','3M','6M','12M','YTD'].map(label => ({ label, pct: null }));
+      if (!this.perf?.twr?.length) return placeholder;
+      const twr = this.perf.twr;
+      const last = twr[twr.length - 1];
+      const currentMult = 1 + last.twr / 100;
+      const lastDate = new Date(last.date);
+      const periods = [
+        { label: '1M',  target: new Date(lastDate.getFullYear(), lastDate.getMonth() - 1, lastDate.getDate()) },
+        { label: '3M',  target: new Date(lastDate.getFullYear(), lastDate.getMonth() - 3, lastDate.getDate()) },
+        { label: '6M',  target: new Date(lastDate.getFullYear(), lastDate.getMonth() - 6, lastDate.getDate()) },
+        { label: '12M', target: new Date(lastDate.getFullYear() - 1, lastDate.getMonth(), lastDate.getDate()) },
+        { label: 'YTD', target: new Date(lastDate.getFullYear(), 0, 1) },
+      ];
+      return periods.map(({ label, target }) => {
+        const past = [...twr].reverse().find(p => new Date(p.date) <= target);
+        if (!past) return { label, pct: null };
+        const pastMult = 1 + past.twr / 100;
+        return { label, pct: (currentMult / pastMult - 1) * 100 };
+      });
     },
 
     // ── modal ─────────────────────────────────────────────────────
@@ -615,6 +638,19 @@ function dashboard() {
 
     get totalTargetPct() {
       return Object.values(this.rebalanceTargets).reduce((a, b) => a + b, 0);
+    },
+
+    // German Abgeltungsteuer: 25% + 5.5% Soli = 26.375%
+    get taxLossOpportunities() {
+      const TAX_RATE = 0.26375;
+      return this.holdings
+        .filter(h => h.unrealized_pnl !== null && h.unrealized_pnl < 0)
+        .sort((a, b) => a.unrealized_pnl - b.unrealized_pnl)
+        .map(h => ({ ...h, taxSaving: Math.abs(h.unrealized_pnl) * TAX_RATE }));
+    },
+
+    get totalTaxSaving() {
+      return this.taxLossOpportunities.reduce((a, h) => a + h.taxSaving, 0);
     },
 
     renderAllSparklines() {
