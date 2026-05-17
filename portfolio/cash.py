@@ -33,6 +33,23 @@ class CashSummary:
         return self.dividends + self.interest + self.stockperks
 
 
+def holder_name(df: pd.DataFrame) -> str | None:
+    """Extract account holder name from transfer description, e.g. 'Incoming transfer from John Doe'."""
+    transfers = df.loc[df["type"].isin(DEPOSIT_TYPES), "description"].dropna()
+    for desc in transfers:
+        if "from " in str(desc).lower():
+            parts = str(desc).split("from ", 1)
+            if len(parts) == 2 and parts[1].strip():
+                name = parts[1].strip()
+                # Keep only the first person's name if there are multiple (e.g. "John Doe und Jane Doe")
+                for sep in [" und ", " and ", " & "]:
+                    if sep in name:
+                        name = name.split(sep)[0].strip()
+                        break
+                return name
+    return None
+
+
 def summarize(df: pd.DataFrame) -> CashSummary:
     """Reduce the ledger to a single cash summary."""
     deposits = df.loc[df["type"].isin(DEPOSIT_TYPES), "amount"].sum()

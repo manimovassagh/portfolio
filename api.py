@@ -13,12 +13,27 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
+import math
+
 from portfolio import benchmark, cash, loader, performance, positions, prices, returns
+
+
+def _f(v):
+    """Convert to JSON-safe float: NaN/Inf → None."""
+    if v is None:
+        return None
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return None
+    if math.isnan(f) or math.isinf(f):
+        return None
+    return f
 
 BASE_DIR = Path(__file__).resolve().parent
 app = FastAPI(title="Trade Republic Portfolio")
@@ -79,12 +94,68 @@ def _serialize_dates(records: list[dict]) -> list[dict]:
 # ── Routes ──────────────────────────────────────────────────────────
 @app.get("/", response_class=HTMLResponse)
 def index(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse(request, "index.html")
 
 
 @app.get("/api/exports")
 def list_export_files():
     return {"exports": [p.name for p in loader.list_exports()]}
+
+
+@app.post("/api/upload")
+async def upload_export(file: UploadFile = File(...)):
+    if not file.filename or not file.filename.endswith(".csv"):
+        raise HTTPException(400, "Only CSV files are accepted")
+    dest = loader.EXPORTS_DIR / file.filename
+    loader.EXPORTS_DIR.mkdir(exist_ok=True)
+    content = await file.read()
+    dest.write_bytes(content)
+    _cache.clear()
+    return {"filename": file.filename, "exports": [p.name for p in loader.list_exports()]}
+
+
+@app.get("/api/analytics")
+def get_analytics(export: str | None = None):
+    s = _state(export)
+    perf = s["perf"]
+    holdings, live = s["holdings"], s["prices"]
+
+    if perf.empty or "portfolio_value" not in perf.columns:
+        return {"monthly": {}, "annual": [], "sharpe": None, "volatility": None,
+                "max_dd_days": 0, "sectors": [], "pnl_series": []}
+
+    pv = perf["portfolio_value"].dropna()
+    contrib = perf["contributions"] if "contributions" in perf.columns else None
+
+    # TWR series removes cash-flow distortion — use it for risk metrics
+    twr_series = returns.twr(pv, contrib) if contrib is not None else pv
+
+    # Sector breakdown by market value
+    sectors: dict[str, float] = {}
+    for h in holdings.values():
+        cur = live.get(h.isin)
+        mv = (cur * h.shares) if cur else h.cost_basis
+        ac = h.asset_class or "Other"
+        sectors[ac] = sectors.get(ac, 0) + mv
+
+    # Unrealized P&L over time (market value - cumulative invested)
+    pnl_series = []
+    if contrib is not None:
+        for ts in perf.index:
+            pv_val = _f(perf.loc[ts, "portfolio_value"])
+            c_val = _f(perf.loc[ts, "contributions"])
+            if pv_val is not None and c_val is not None:
+                pnl_series.append({"date": ts.strftime("%Y-%m-%d"), "pnl": round(pv_val - c_val, 2)})
+
+    return {
+        "monthly": returns.monthly_returns(twr_series),
+        "annual": returns.annual_returns(pv),
+        "sharpe": _f(returns.sharpe_ratio(twr_series)),
+        "volatility": _f(returns.annualized_volatility(twr_series)),
+        "max_dd_days": returns.max_drawdown_duration(pv),
+        "sectors": [{"label": k, "value": _f(v)} for k, v in sectors.items()],
+        "pnl_series": pnl_series,
+    }
 
 
 @app.get("/api/summary")
@@ -135,6 +206,7 @@ def get_summary(export: str | None = None):
         "tax": summary.tax,
         "n_holdings": len(holdings),
         "n_realized": len(realized),
+        "holder_name": cash.holder_name(df),
         "first_trade_date": df.loc[df["category"] == "TRADING", "date"].min().strftime("%Y-%m-%d")
         if not df[df["category"] == "TRADING"].empty
         else None,
@@ -182,9 +254,9 @@ def get_performance(export: str | None = None, include_benchmark: bool = True):
     series = [
         {
             "date": ts.strftime("%Y-%m-%d"),
-            "portfolio_value": float(perf.loc[ts, "portfolio_value"]) if "portfolio_value" in perf.columns else None,
-            "contributions": float(perf.loc[ts, "contributions"]) if "contributions" in perf.columns else None,
-            "holdings_value": float(perf.loc[ts, "holdings_value"]) if "holdings_value" in perf.columns else None,
+            "portfolio_value": _f(perf.loc[ts, "portfolio_value"]) if "portfolio_value" in perf.columns else None,
+            "contributions": _f(perf.loc[ts, "contributions"]) if "contributions" in perf.columns else None,
+            "holdings_value": _f(perf.loc[ts, "holdings_value"]) if "holdings_value" in perf.columns else None,
         }
         for ts in perf.index
     ]
@@ -194,8 +266,11 @@ def get_performance(export: str | None = None, include_benchmark: bool = True):
     dd = returns.drawdown(pv).fillna(0)
     twr_series = returns.twr(pv, contrib)
 
-    drawdown_data = [{"date": ts.strftime("%Y-%m-%d"), "drawdown": float(dd.loc[ts]) * 100} for ts in dd.index]
-    twr_data = [{"date": ts.strftime("%Y-%m-%d"), "twr": (float(twr_series.loc[ts]) - 1) * 100} for ts in twr_series.index]
+    drawdown_data = [{"date": ts.strftime("%Y-%m-%d"), "drawdown": _f(dd.loc[ts] * 100) or 0.0} for ts in dd.index]
+    twr_data = [
+        {"date": ts.strftime("%Y-%m-%d"), "twr": _f((twr_series.loc[ts] - 1) * 100) or 0.0}
+        for ts in twr_series.index
+    ]
 
     bench_payload = None
     if include_benchmark:
@@ -213,7 +288,7 @@ def get_performance(export: str | None = None, include_benchmark: bool = True):
             bench_payload = {
                 "name": bench_name,
                 "series": [
-                    {"date": ts.strftime("%Y-%m-%d"), "value": float(hypo.loc[ts]) if ts in hypo.index else None}
+                    {"date": ts.strftime("%Y-%m-%d"), "value": _f(hypo.loc[ts]) if ts in hypo.index else None}
                     for ts in perf.index
                 ],
             }
