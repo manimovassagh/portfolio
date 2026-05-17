@@ -12,6 +12,10 @@ node_modules/
 exports/**
 !exports/
 !exports/sample-portfolio.csv
-.playwright-mcp
-screenshots
+.playwright-mcp/
+screenshots/
 certs/
+.claude/
+.DS_Store
+cache/
+static/dist/
