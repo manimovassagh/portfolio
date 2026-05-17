@@ -1,6 +1,6 @@
 export type ExportName = string;
 
-export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance';
+export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance' | 'goals';
 export type ChartMode = 'Value' | 'TWR' | 'Drawdown';
 
 export type Summary = {
