@@ -8,6 +8,8 @@ Run with:  uv run uvicorn api:app --reload --port 8000
 """
 from __future__ import annotations
 
+import math
+import os
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -17,8 +19,6 @@ from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-
-import math
 
 from portfolio import benchmark, cash, loader, performance, positions, prices, returns
 
@@ -67,6 +67,18 @@ def _state(export_name: str | None = None) -> dict[str, Any]:
     perf = performance.performance_series(df)
     summary = cash.summarize(df)
 
+    # Sparklines: reuse the same price fetch, cache with everything else
+    spark_end = pd.Timestamp.now().normalize()
+    spark_start = spark_end - pd.Timedelta(days=90)
+    hist = performance._historical_prices(isins, spark_start, spark_end)
+    spark_data: dict[str, list[float]] = {}
+    if not hist.empty:
+        for isin in isins:
+            if isin in hist.columns:
+                series = hist[isin].dropna().tolist()
+                if series:
+                    spark_data[isin] = [float(v) for v in series]
+
     _cache.clear()
     _cache[key] = {
         "export": chosen,
@@ -76,6 +88,7 @@ def _state(export_name: str | None = None) -> dict[str, Any]:
         "prices": live,
         "perf": perf,
         "summary": summary,
+        "spark_data": spark_data,
         "exports": [p.name for p in exports],
     }
     return _cache[key]
@@ -102,16 +115,23 @@ def list_export_files():
     return {"exports": [p.name for p in loader.list_exports()]}
 
 
+_MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
 @app.post("/api/upload")
 async def upload_export(file: UploadFile = File(...)):
     if not file.filename or not file.filename.endswith(".csv"):
         raise HTTPException(400, "Only CSV files are accepted")
-    dest = loader.EXPORTS_DIR / file.filename
-    loader.EXPORTS_DIR.mkdir(exist_ok=True)
+    safe_name = os.path.basename(file.filename)
+    if not safe_name or ".." in safe_name:
+        raise HTTPException(400, "Invalid filename")
     content = await file.read()
-    dest.write_bytes(content)
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(413, "File too large (max 10 MB)")
+    loader.EXPORTS_DIR.mkdir(exist_ok=True)
+    (loader.EXPORTS_DIR / safe_name).write_bytes(content)
     _cache.clear()
-    return {"filename": file.filename, "exports": [p.name for p in loader.list_exports()]}
+    return {"filename": safe_name, "exports": [p.name for p in loader.list_exports()]}
 
 
 @app.get("/api/analytics")
@@ -216,14 +236,24 @@ def get_summary(export: str | None = None):
 @app.get("/api/holdings")
 def get_holdings(export: str | None = None):
     s = _state(export)
-    holdings, live = s["holdings"], s["prices"]
+    holdings, live, df = s["holdings"], s["prices"], s["df"]
     total_mv = sum(live.get(isin, 0) * h.shares for isin, h in holdings.items())
+
+    # TTM dividends per ISIN
+    ttm_cutoff = pd.Timestamp.now() - pd.DateOffset(years=1)
+    ttm_divs = (
+        df[(df["type"] == "DIVIDEND") & (df["date"] >= ttm_cutoff)]
+        .groupby("symbol")["amount"]
+        .sum()
+        .to_dict()
+    )
 
     rows = []
     for h in holdings.values():
         cur = live.get(h.isin)
         market_value = (cur * h.shares) if cur else None
         unrealized = (market_value - h.cost_basis) if market_value is not None else None
+        ttm_div = ttm_divs.get(h.isin, 0.0)
         rows.append(
             {
                 "isin": h.isin,
@@ -238,6 +268,8 @@ def get_holdings(export: str | None = None):
                 "unrealized_pct": (unrealized / h.cost_basis * 100) if unrealized is not None and h.cost_basis else None,
                 "weight": (market_value / total_mv * 100) if market_value and total_mv else 0,
                 "fees_paid": h.fees_paid,
+                "ttm_dividend": _f(ttm_div),
+                "ttm_yield": _f(ttm_div / market_value * 100) if market_value and ttm_div else None,
             }
         )
     rows.sort(key=lambda r: -(r["market_value"] or 0))
@@ -404,22 +436,7 @@ def get_asset(isin: str, export: str | None = None):
 
 
 @app.get("/api/sparklines")
-def get_sparklines(export: str | None = None, days: int = 90):
-    """Per-holding price sparkline for the last N days."""
+def get_sparklines(export: str | None = None):
+    """Per-holding price sparkline for the last 90 days (pre-computed in cache)."""
     s = _state(export)
-    isins = list(s["holdings"].keys())
-    if not isins:
-        return {"sparklines": {}}
-
-    end = pd.Timestamp.now().normalize()
-    start = end - pd.Timedelta(days=days)
-    hist = performance._historical_prices(isins, start, end)
-    out: dict[str, list[float]] = {}
-    if hist.empty:
-        return {"sparklines": out}
-    for isin in isins:
-        if isin in hist.columns:
-            series = hist[isin].dropna().tolist()
-            if series:
-                out[isin] = [float(v) for v in series]
-    return {"sparklines": out}
+    return {"sparklines": s.get("spark_data", {})}

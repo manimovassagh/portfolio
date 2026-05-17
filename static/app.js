@@ -32,10 +32,12 @@ function dashboard() {
     realizedTotal: 0,
     tax: [],
     sparklines: {},
+    sparklinesLoaded: false,
 
     modal: { open: false, isin: null, name: null, current: null, transactions: [] },
     dragging: false,
     uploadToast: null,
+    errorToast: null,
     analytics: null,
     rebalanceMode: false,
     rebalanceTargets: {},
@@ -68,6 +70,7 @@ function dashboard() {
       this.exports = exports;
       this.export_name = exports[0] || null;
       await this.loadAll();
+      if (this.active === 'holdings') this.loadSparklines();
     },
 
     async uploadCSV(event) {
@@ -104,7 +107,11 @@ function dashboard() {
     navigate(id) {
       this.active = id;
       localStorage.setItem('activeTab', id);
-      this.$nextTick(() => { lucide.createIcons(); this.renderAllCharts(); });
+      this.$nextTick(() => {
+        lucide.createIcons();
+        this.renderAllCharts();
+        if (id === 'holdings') this.loadSparklines();
+      });
     },
 
     toggleTheme() {
@@ -116,39 +123,66 @@ function dashboard() {
 
     async refresh() {
       this.loading = true;
+      this.sparklinesLoaded = false;
       try { await this.loadAll(); } finally { this.loading = false; }
+    },
+
+    showError(msg) {
+      this.errorToast = msg;
+      setTimeout(() => { this.errorToast = null; }, 5000);
+    },
+
+    async fetchSafe(url) {
+      try {
+        const r = await fetch(url);
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return await r.json();
+      } catch (e) {
+        console.warn('Kapital fetch failed:', url, e);
+        return null;
+      }
     },
 
     async loadAll() {
       const q = `?export=${encodeURIComponent(this.export_name || '')}`;
-      const [summary, holdings, perf, cashFlow, income, realized, tax, sparks, analytics] = await Promise.all([
-        fetch('/api/summary'     + q).then(r => r.json()),
-        fetch('/api/holdings'    + q).then(r => r.json()),
-        fetch('/api/performance' + q).then(r => r.json()),
-        fetch('/api/cash_flow'   + q).then(r => r.json()),
-        fetch('/api/income'      + q).then(r => r.json()),
-        fetch('/api/realized'    + q).then(r => r.json()),
-        fetch('/api/tax'         + q).then(r => r.json()),
-        fetch('/api/sparklines'  + q).then(r => r.json()),
-        fetch('/api/analytics'   + q).then(r => r.json()),
+      // Sparklines excluded — lazy-loaded on Holdings tab open
+      const [summary, holdings, perf, cashFlow, income, realized, tax, analytics] = await Promise.all([
+        this.fetchSafe('/api/summary'     + q),
+        this.fetchSafe('/api/holdings'    + q),
+        this.fetchSafe('/api/performance' + q),
+        this.fetchSafe('/api/cash_flow'   + q),
+        this.fetchSafe('/api/income'      + q),
+        this.fetchSafe('/api/realized'    + q),
+        this.fetchSafe('/api/tax'         + q),
+        this.fetchSafe('/api/analytics'   + q),
       ]);
 
-      this.summary       = summary;
-      if (summary.holder_name) this.holderName = summary.holder_name;
-      this.holdings      = holdings.holdings;
-      this.totalMV       = holdings.total_market_value;
-      this.perf          = perf;
-      this.cashFlow      = cashFlow;
-      this.income        = income.log;
-      this.incomeTotals  = income.totals;
-      this.realized      = realized.realized;
-      this.realizedTotal = realized.total;
-      this.tax           = tax.records;
-      this.sparklines    = sparks.sparklines;
-      this.analytics     = analytics;
-      this.lastUpdated   = new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
+      const failed = [];
+      if (summary)   { this.summary = summary; if (summary.holder_name) this.holderName = summary.holder_name; } else failed.push('summary');
+      if (holdings)  { this.holdings = holdings.holdings; this.totalMV = holdings.total_market_value; } else failed.push('holdings');
+      if (perf)      { this.perf = perf; } else failed.push('performance');
+      if (cashFlow)  { this.cashFlow = cashFlow; } else failed.push('cash flow');
+      if (income)    { this.income = income.log; this.incomeTotals = income.totals; } else failed.push('income');
+      if (realized)  { this.realized = realized.realized; this.realizedTotal = realized.total; } else failed.push('realized');
+      if (tax)       { this.tax = tax.records; } else failed.push('tax');
+      if (analytics) { this.analytics = analytics; } else failed.push('analytics');
 
+      if (failed.length) this.showError(`Failed to load: ${failed.join(', ')}`);
+
+      this.sparklinesLoaded = false;
+      this.lastUpdated = new Date().toLocaleString('en-GB', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' });
       this.$nextTick(() => { lucide.createIcons(); this.renderAllCharts(); });
+    },
+
+    async loadSparklines() {
+      if (this.sparklinesLoaded) return;
+      const q = `?export=${encodeURIComponent(this.export_name || '')}`;
+      const data = await this.fetchSafe('/api/sparklines' + q);
+      if (data) {
+        this.sparklines = data.sparklines;
+        this.sparklinesLoaded = true;
+        this.$nextTick(() => this.renderAllSparklines());
+      }
     },
 
     // ── formatting helpers ────────────────────────────────────────
@@ -195,8 +229,8 @@ function dashboard() {
     // ── KPI cards ─────────────────────────────────────────────────
     get kpis() {
       const s = this.summary;
-      if (!s) return Array.from({ length: 6 }, () => ({
-        label: '—', value: '—', delta: '', deltaClass: '', icon: 'loader-2', colorClass: 'text-ink-400'
+      if (!s) return Array.from({ length: 6 }, (_, i) => ({
+        label: `Loading ${i + 1}`, value: '—', delta: '', deltaClass: '', icon: 'loader-2', colorClass: 'text-ink-400'
       }));
       const fmt = (v) => this.fmtEUR(v);
       const pct = (v) => (v >= 0 ? '+' : '') + (v * 100).toFixed(2) + '%';

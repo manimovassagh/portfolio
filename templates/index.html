@@ -39,7 +39,7 @@
   <style>
     html, body { font-feature-settings: "ss01","ss03","cv11"; }
     body { font-variant-numeric: tabular-nums; }
-    .num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
+    .num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: 0; }
     .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.7rem; }
 
     /* ── Cards — solid dark glass ────────────────── */
@@ -124,6 +124,48 @@
     .tr-hover { transition: border-left-color 0.12s, background 0.12s; border-left: 3px solid transparent; }
     .tr-hover:hover { border-left-color: #10b981; background: rgba(16,185,129,0.04); }
     .dark .tr-hover:hover { background: rgba(16,185,129,0.06); }
+
+    /* ── Rolling return cards ───────────────────── */
+    .return-strip {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 0.75rem;
+      justify-content: start;
+    }
+    @media (min-width: 640px) {
+      .return-strip { grid-template-columns: repeat(5, minmax(112px, 1fr)); }
+    }
+    @media (min-width: 1280px) {
+      .return-strip { grid-template-columns: repeat(5, 164px); }
+    }
+    @media (min-width: 1536px) {
+      .return-strip { grid-template-columns: repeat(5, 176px); }
+    }
+    .return-card {
+      min-height: 82px;
+      padding: 0.875rem;
+      text-align: left;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      gap: 0.5rem;
+    }
+    .return-label {
+      font-size: 0.8rem;
+      line-height: 1;
+      font-weight: 800;
+      color: #d4d4d8;
+    }
+    html:not(.dark) .return-label { color: #3f3f46; }
+    .return-value {
+      font-size: 1.25rem;
+      line-height: 1;
+      font-weight: 800;
+    }
+    .return-track { height: 0.25rem; }
+    @media (max-width: 420px) {
+      .return-strip { grid-template-columns: 1fr; }
+      .return-card { min-height: 84px; }
+    }
 
     /* ── KPI pop-in with bounce ──────────────────── */
     @keyframes countUp {
@@ -241,7 +283,7 @@
             </label>
             <button @click="refresh()" :disabled="loading"
                     class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-ink-200 dark:border-ink-800 hover:bg-ink-100 dark:hover:bg-ink-900 transition-colors disabled:opacity-50">
-              <i data-lucide="refresh-cw" :class="loading ? 'animate-spin' : ''" class="w-3.5 h-3.5"></i>
+              <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
               <span class="hidden sm:inline">Refresh</span>
             </button>
             <!-- Theme toggle — always visible in header -->
@@ -271,6 +313,13 @@
         <span x-text="uploadToast"></span>
       </div>
 
+      <!-- Error toast -->
+      <div x-show="errorToast" x-cloak x-transition
+           class="fixed bottom-20 lg:bottom-6 left-6 z-50 flex items-center gap-2.5 px-4 py-3 rounded-xl bg-rose-500 text-white text-sm font-medium shadow-lg shadow-rose-500/30">
+        <i data-lucide="alert-triangle" class="w-4 h-4 shrink-0"></i>
+        <span x-text="errorToast"></span>
+      </div>
+
       <!-- Content -->
       <div class="px-6 lg:px-8 py-6 pb-24 lg:pb-6 max-w-[1400px]"
            @dragover.prevent="dragging = true"
@@ -280,17 +329,17 @@
         <!-- ════════════ Overview ════════════ -->
         <section id="overview" x-show="active === 'overview'" x-transition:enter="section-enter" class="space-y-5">
           <!-- KPI strip -->
-          <div class="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
             <template x-for="(k, idx) in kpis" :key="k.label">
-              <div class="card rounded-xl p-4 overflow-hidden" :class="k.accentClass">
-                <div class="flex items-center justify-between mb-2">
-                  <div class="text-[9px] font-semibold uppercase tracking-widest text-ink-400 dark:text-ink-500" x-text="k.label"></div>
-                  <i :data-lucide="k.icon" class="w-3.5 h-3.5 text-ink-300 dark:text-ink-600"></i>
+              <div class="card rounded-xl p-5 min-h-[132px] overflow-hidden" :class="k.accentClass">
+                <div class="flex items-center justify-between gap-3 mb-3">
+                  <div class="text-[11px] font-semibold uppercase tracking-wider text-ink-400 dark:text-ink-500" x-text="k.label"></div>
+                  <i :data-lucide="k.icon" class="w-4 h-4 text-ink-300 dark:text-ink-600 shrink-0"></i>
                 </div>
-                <div class="kpi-value num text-[1.65rem] font-bold tracking-tight leading-none" :class="k.colorClass" x-text="k.value"
+                <div class="kpi-value num text-[2rem] font-bold leading-none" :class="k.colorClass" x-text="k.value"
                      :style="`animation-delay: ${idx * 60}ms`"></div>
-                <div class="mt-2 flex items-center gap-1 text-[11px] font-medium" :class="k.deltaClass">
-                  <i x-show="k.deltaIcon" :data-lucide="k.deltaIcon" class="w-3 h-3 shrink-0"></i>
+                <div class="mt-3 flex items-center gap-1.5 text-sm font-medium" :class="k.deltaClass">
+                  <i x-show="k.deltaIcon" :data-lucide="k.deltaIcon" class="w-3.5 h-3.5 shrink-0"></i>
                   <span class="truncate" x-text="k.delta"></span>
                 </div>
               </div>
@@ -298,15 +347,20 @@
           </div>
 
           <!-- Rolling returns strip -->
-          <div class="grid grid-cols-5 gap-2">
+          <div class="return-strip">
             <template x-for="r in rollingReturns" :key="r.label">
-              <div class="card rounded-xl px-3 py-3 text-center flex flex-col items-center gap-1.5"
+              <div class="card return-card rounded-xl"
                    :class="r.pct === null ? 'card-neutral' : r.pct >= 0 ? 'card-gain' : 'card-loss'">
-                <div class="text-[9px] font-semibold uppercase tracking-widest text-ink-400 dark:text-ink-500" x-text="r.label"></div>
-                <div class="num text-base font-bold leading-none"
+                <div class="flex items-center justify-between gap-3">
+                  <div class="return-label" x-text="r.label"></div>
+                  <i :data-lucide="r.pct === null ? 'minus' : r.pct >= 0 ? 'arrow-up-right' : 'arrow-down-right'"
+                     class="w-4 h-4 shrink-0"
+                     :class="r.pct === null ? 'text-ink-500' : r.pct >= 0 ? 'text-emerald-500' : 'text-rose-500'"></i>
+                </div>
+                <div class="num return-value self-center"
                      :class="r.pct === null ? 'text-ink-400' : r.pct >= 0 ? 'text-emerald-500' : 'text-rose-500'"
                      x-text="r.pct !== null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(2) + '%' : '—'"></div>
-                <div class="w-full h-0.5 rounded-full overflow-hidden bg-black/10 dark:bg-white/10">
+                <div class="return-track w-full rounded-full overflow-hidden bg-black/10 dark:bg-white/10">
                   <div class="h-full rounded-full transition-all"
                        :style="`width:${r.pct !== null ? Math.min(100, Math.abs(r.pct) * 4) : 0}%;background:${(r.pct ?? 0) >= 0 ? '#10b981' : '#f43f5e'}`"></div>
                 </div>
@@ -371,7 +425,10 @@
                 </template>
               </div>
             </div>
-            <div id="hero-chart" class="mt-4 -ml-3"></div>
+            <div class="mt-4 -ml-3 relative">
+              <div x-show="!perf" class="skeleton h-[360px] w-full rounded-xl absolute inset-0 z-10"></div>
+              <div id="hero-chart"></div>
+            </div>
           </div>
 
           <!-- Best & worst days -->
@@ -384,7 +441,7 @@
                 <div class="text-sm font-semibold tracking-tight">Best days</div>
               </div>
               <div class="space-y-2">
-                <template x-for="d in perf?.best_worst?.best" :key="d.date">
+                <template x-for="(d, idx) in perf?.best_worst?.best" :key="`${d.date}-${idx}`">
                   <div class="flex items-center justify-between py-1 border-b border-ink-100/60 dark:border-ink-800/40 last:border-0">
                     <div class="text-xs text-ink-500 dark:text-ink-400 font-mono" x-text="d.date"></div>
                     <div class="num text-sm font-semibold text-emerald-500" x-text="'+' + fmtEUR(d.pnl)"></div>
@@ -400,7 +457,7 @@
                 <div class="text-sm font-semibold tracking-tight">Worst days</div>
               </div>
               <div class="space-y-2">
-                <template x-for="d in perf?.best_worst?.worst" :key="d.date">
+                <template x-for="(d, idx) in perf?.best_worst?.worst" :key="`${d.date}-${idx}`">
                   <div class="flex items-center justify-between py-1 border-b border-ink-100/60 dark:border-ink-800/40 last:border-0">
                     <div class="text-xs text-ink-500 dark:text-ink-400 font-mono" x-text="d.date"></div>
                     <div class="num text-sm font-semibold text-rose-500" x-text="fmtEUR(d.pnl)"></div>
@@ -450,6 +507,7 @@
               <h2 class="text-sm font-semibold tracking-tight">Monthly returns</h2>
               <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Month-over-month portfolio % change</p>
             </div>
+            <div x-show="!analytics" class="skeleton h-40 w-full rounded-xl"></div>
             <div id="heatmap"></div>
           </div>
 
@@ -460,6 +518,7 @@
                 <h2 class="text-sm font-semibold tracking-tight">Annual P&L</h2>
                 <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Year-over-year portfolio gain/loss</p>
               </div>
+              <div x-show="!analytics" class="skeleton h-[260px] w-full rounded-xl"></div>
               <div id="annual-chart"></div>
             </div>
             <div class="card rounded-xl p-5">
@@ -467,6 +526,7 @@
                 <h2 class="text-sm font-semibold tracking-tight">Allocation by asset class</h2>
                 <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">Diversification breakdown</p>
               </div>
+              <div x-show="!analytics" class="skeleton h-[280px] w-full rounded-xl"></div>
               <div id="sector-donut"></div>
             </div>
           </div>
@@ -622,6 +682,7 @@
                     <th class="text-right font-medium px-3 py-2.5">Market value</th>
                     <th class="text-right font-medium px-3 py-2.5">P&L</th>
                     <th class="text-right font-medium px-3 py-2.5">P&L %</th>
+                    <th class="text-right font-medium px-3 py-2.5">Yield</th>
                     <th class="text-right font-medium px-3 py-2.5">Weight</th>
                     <th class="text-right font-medium px-4 py-2.5">90d trend</th>
                   </tr>
@@ -651,6 +712,8 @@
                       <td class="num text-right px-3 py-3 text-xs font-medium"
                           :class="h.unrealized_pct >= 0 ? 'text-emerald-500' : 'text-rose-500'"
                           x-text="h.unrealized_pct !== null ? (h.unrealized_pct >= 0 ? '+' : '') + h.unrealized_pct.toFixed(2) + '%' : '—'"></td>
+                      <td class="num text-right px-3 py-3 text-sky-400 text-xs"
+                          x-text="h.ttm_yield ? h.ttm_yield.toFixed(2) + '%' : '—'"></td>
                       <td class="num text-right px-3 py-3 text-ink-500 dark:text-ink-400" x-text="h.weight.toFixed(1) + '%'"></td>
                       <td class="px-4 py-3">
                         <div :id="'spark-' + h.isin.replace(/[^a-z0-9]/gi,'_')" class="spark ml-auto"></div>
@@ -658,7 +721,7 @@
                     </tr>
                   </template>
                   <template x-if="!holdings.length">
-                    <tr><td colspan="9" class="text-center py-8 text-ink-500 text-sm">No holdings.</td></tr>
+                    <tr><td colspan="10" class="text-center py-8 text-ink-500 text-sm">No holdings.</td></tr>
                   </template>
                 </tbody>
               </table>
@@ -717,7 +780,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-ink-200/40 dark:divide-ink-800/40">
-                <template x-for="r in income" :key="r.Date + r.Type + r.Asset">
+                <template x-for="(r, idx) in income" :key="`${r.Date}-${r.Type}-${r.Asset}-${idx}`">
                   <tr>
                     <td class="px-4 py-2.5 font-mono text-xs" x-text="r.Date"></td>
                     <td class="px-3 py-2.5">
@@ -761,7 +824,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-ink-200/40 dark:divide-ink-800/40">
-                <template x-for="r in realized" :key="r.date + r.isin + r.shares">
+                <template x-for="(r, idx) in realized" :key="`${r.date}-${r.isin}-${r.shares}-${idx}`">
                   <tr>
                     <td class="px-4 py-2.5 font-mono text-xs" x-text="r.date"></td>
                     <td class="px-3 py-2.5 font-medium" x-text="r.name"></td>
@@ -802,7 +865,7 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-ink-200/40 dark:divide-ink-800/40">
-                <template x-for="r in tax" :key="r.Date + r.Type + r.Asset">
+                <template x-for="(r, idx) in tax" :key="`${r.Date}-${r.Type}-${r.Asset}-${idx}`">
                   <tr>
                     <td class="px-4 py-2.5 font-mono text-xs" x-text="r.Date"></td>
                     <td class="px-3 py-2.5">
@@ -874,7 +937,7 @@
             </tr>
           </thead>
           <tbody class="divide-y divide-ink-200/40 dark:divide-ink-800/40">
-            <template x-for="t in modal.transactions" :key="t.date + t.type + t.amount">
+            <template x-for="(t, idx) in modal.transactions" :key="`${t.date}-${t.type}-${t.amount}-${idx}`">
               <tr>
                 <td class="px-4 py-2 font-mono text-xs" x-text="t.date"></td>
                 <td class="px-3 py-2">
