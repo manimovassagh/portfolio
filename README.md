@@ -21,13 +21,16 @@ Opens at <http://127.0.0.1:8765>.
 ## Tabs
 
 - **Overview** — headline numbers, rolling returns, performance chart, and movers.
-- **Analytics** — monthly returns, annual P&L, allocation, and unrealized P&L over time.
-- **Holdings** — current holdings with shares, avg cost, market value, unrealized P&L.
+- **Analytics** — monthly returns, annual P&L, allocation, geographic exposure, unrealized P&L over time.
+- **Holdings** — current holdings with shares, avg cost, market value, unrealized P&L, TTM yield.
 - **Cash flow** — cash balance area chart + inflow/outflow waterfall.
-- **Income** — dividends, interest, stock perks log.
+- **Income** — dividends, interest, stock perks log + dividend calendar.
 - **Realized P&L** — closed trades with per-trade P&L.
-- **Tax** — Vorabpauschale, withholding tax, capital gains tax (German tax view).
-- **Asset modal** — per-asset transaction history.
+- **Tax** — Vorabpauschale, withholding tax, capital gains tax; FSA (Freistellungsauftrag) tracker.
+- **Watchlist** — track assets with target prices; persisted in SQLite.
+- **Rebalance** — enter target weights, see buy/sell actions needed.
+- **Goals / FIRE** — FIRE number calculator, custom goal tracker, 10-year projection.
+- **Asset modal** — per-asset transaction history with position notes.
 
 ## Adding a new asset
 
@@ -41,19 +44,32 @@ Currency handling: USD-denominated tickers are FX-converted to EUR automatically
 ## File layout
 
 ```
-portfolio/
-├── api.py                    # FastAPI backend
-├── src/                      # React + TypeScript frontend
-├── templates/index.html      # React mount page
-├── static/dist/              # Built frontend assets
-├── pyproject.toml
-├── package.json
-├── portfolio/
+├── api.py                    # FastAPI entry point (20 lines)
+├── app/
+│   ├── deps.py               # Shared state cache + helpers
+│   ├── schemas.py            # Pydantic response models
+│   └── routers/
+│       ├── core.py           # SPA index, export listing, CSV upload
+│       ├── portfolio.py      # Summary, holdings, performance, income…
+│       ├── analytics.py      # Analytics, geographic, FSA, dividends
+│       └── watchlist.py      # Watchlist CRUD
+├── portfolio/                # Pure data layer
 │   ├── loader.py             # CSV → DataFrame
 │   ├── positions.py          # Holdings & realized P&L (avg-cost basis)
 │   ├── cash.py               # Cash flow & income
 │   ├── prices.py             # Live prices via yfinance, FX-adjusted
-│   └── performance.py        # Daily portfolio value vs contributions
+│   ├── performance.py        # Daily portfolio value vs contributions
+│   ├── returns.py            # TWR, XIRR, Sharpe, drawdown
+│   ├── benchmark.py          # Benchmark comparison
+│   └── db.py                 # SQLite persistence (watchlist)
+├── src/                      # React + TypeScript frontend
+│   ├── App.tsx               # Root: state, layout, routing
+│   ├── lib/                  # Pure utilities (format, chart theme)
+│   └── components/
+│       ├── ui/               # Card, MetricCard, InfoModal, …
+│       ├── charts/           # HeroChart, AllocationTreemap
+│       └── views/            # One file per tab
+├── index.html                # Vite entry point
 ├── exports/                  # Drop CSVs here
-└── cache/                    # Price + ticker cache
+└── portfolio.db              # SQLite database (watchlist)
 ```
