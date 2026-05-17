@@ -135,9 +135,12 @@ def max_drawdown_duration(portfolio_value: pd.Series) -> int:
     return max_dur
 
 
-def best_worst_days(portfolio_value: pd.Series, top_n: int = 3) -> dict:
-    """Return best and worst single-day P&L days."""
-    daily = portfolio_value.diff().dropna()
+def best_worst_days(portfolio_value: pd.Series, contributions: pd.Series | None = None, top_n: int = 3) -> dict:
+    """Return best and worst single-day market P&L days, excluding cash deposits/withdrawals."""
+    daily = portfolio_value.diff()
+    if contributions is not None:
+        daily = daily - contributions.diff()
+    daily = daily.dropna()
     if daily.empty:
         return {"best": [], "worst": []}
     best = daily.nlargest(top_n)

@@ -1,10 +1,10 @@
 .PHONY: run dev frontend typecheck install clean cache exports help
 
 run: frontend
-	uv run uvicorn api:app --host 0.0.0.0 --port 8765
+	uv run uvicorn api:app --host 0.0.0.0 --port 8765 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
 
 dev: frontend
-	uv run uvicorn api:app --host 0.0.0.0 --reload --port 8765
+	uv run uvicorn api:app --host 0.0.0.0 --reload --port 8765 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
 
 frontend:
 	npm run build

@@ -330,7 +330,7 @@ def get_performance(export: str | None = None, include_benchmark: bool = True):
         "drawdown": drawdown_data,
         "twr": twr_data,
         "benchmark": bench_payload,
-        "best_worst": returns.best_worst_days(pv),
+        "best_worst": returns.best_worst_days(pv, contrib),
     }
 
 

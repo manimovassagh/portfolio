@@ -314,21 +314,33 @@ function Overview({ data, dark, chartMode, setChartMode, openAsset }: { data: Da
         {data.perf.best_worst.best[0] && (
           <Card className="border-l-4 border-l-emerald-500 p-4">
             <div className="flex items-center justify-between">
-              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">Best day</div>
+              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">Best days</div>
               <ArrowUpRight size={16} className="text-emerald-500" />
             </div>
-            <div className="num mt-4 text-xl font-black tracking-normal text-emerald-500">{signedEUR(data.perf.best_worst.best[0].pnl)}</div>
-            <div className="mt-1 text-xs text-slate-500">{data.perf.best_worst.best[0].date}</div>
+            <div className="mt-3 space-y-2">
+              {data.perf.best_worst.best.map((d, i) => (
+                <div key={d.date} className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{d.date}</span>
+                  <span className={`num text-sm font-black ${i === 0 ? 'text-emerald-500' : 'text-emerald-400'}`}>{signedEUR(d.pnl)}</span>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
         {data.perf.best_worst.worst[0] && (
           <Card className="border-l-4 border-l-rose-500 p-4">
             <div className="flex items-center justify-between">
-              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">Worst day</div>
+              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">Worst days</div>
               <ArrowDownRight size={16} className="text-rose-500" />
             </div>
-            <div className="num mt-4 text-xl font-black tracking-normal text-rose-500">{signedEUR(data.perf.best_worst.worst[0].pnl)}</div>
-            <div className="mt-1 text-xs text-slate-500">{data.perf.best_worst.worst[0].date}</div>
+            <div className="mt-3 space-y-2">
+              {data.perf.best_worst.worst.map((d, i) => (
+                <div key={d.date} className="flex items-center justify-between">
+                  <span className="text-xs text-slate-500">{d.date}</span>
+                  <span className={`num text-sm font-black ${i === 0 ? 'text-rose-500' : 'text-rose-400'}`}>{signedEUR(d.pnl)}</span>
+                </div>
+              ))}
+            </div>
           </Card>
         )}
       </div>
