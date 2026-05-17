@@ -4,22 +4,21 @@ from __future__ import annotations
 
 import os
 
-from fastapi import APIRouter, File, HTTPException, Request, UploadFile
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import FileResponse
 
 from app.deps import BASE_DIR, clear_cache
 from portfolio import loader
 
 router = APIRouter()
-templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
+_DIST = BASE_DIR / "static" / "dist"
 _MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 
 
-@router.get("/", response_class=HTMLResponse)
-def index(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "index.html")
+@router.get("/", response_class=FileResponse)
+def index() -> FileResponse:
+    return FileResponse(_DIST / "index.html")
 
 
 @router.get("/api/exports")

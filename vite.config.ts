@@ -3,13 +3,14 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  base: '/static/dist/',
   build: {
     outDir: 'static/dist',
     emptyOutDir: true,
     sourcemap: true,
     chunkSizeWarningLimit: 700,
     rollupOptions: {
-      input: 'src/main.tsx',
+      input: 'index.html',
       output: {
         entryFileNames: 'app.js',
         chunkFileNames: 'chunks/[name]-[hash].js',
