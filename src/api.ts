@@ -3,13 +3,18 @@ import type {
   AssetDetail,
   CashFlow,
   DashboardData,
+  DividendCalendarData,
   ExportName,
+  FsaData,
+  GeographicData,
   Holding,
   IncomeRow,
   Performance,
   RealizedRow,
   Summary,
   TaxRow,
+  WatchlistData,
+  WatchlistItem,
 } from './types';
 
 async function getJson<T>(url: string): Promise<T> {
@@ -56,6 +61,38 @@ export async function loadDashboard(exportName: ExportName): Promise<DashboardDa
 
 export async function loadAsset(isin: string, exportName: ExportName): Promise<AssetDetail> {
   return getJson<AssetDetail>(`/api/asset/${encodeURIComponent(isin)}?export=${encodeURIComponent(exportName)}`);
+}
+
+export async function fetchGeographic(exportName: ExportName): Promise<GeographicData> {
+  return getJson<GeographicData>(`/api/geographic?export=${encodeURIComponent(exportName)}`);
+}
+
+export async function fetchFsa(exportName: ExportName): Promise<FsaData> {
+  return getJson<FsaData>(`/api/fsa?export=${encodeURIComponent(exportName)}`);
+}
+
+export async function fetchWatchlist(): Promise<WatchlistData> {
+  return getJson<WatchlistData>('/api/watchlist');
+}
+
+export async function addWatchlistItem(item: Omit<WatchlistItem, 'added_date' | 'current_price'>): Promise<WatchlistData> {
+  const response = await fetch('/api/watchlist', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(item),
+  });
+  if (!response.ok) throw new Error(`Add watchlist item failed with HTTP ${response.status}`);
+  return response.json() as Promise<WatchlistData>;
+}
+
+export async function removeWatchlistItem(isin: string): Promise<WatchlistData> {
+  const response = await fetch(`/api/watchlist/${encodeURIComponent(isin)}`, { method: 'DELETE' });
+  if (!response.ok) throw new Error(`Remove watchlist item failed with HTTP ${response.status}`);
+  return response.json() as Promise<WatchlistData>;
+}
+
+export async function fetchDividendCalendar(exportName: ExportName): Promise<DividendCalendarData> {
+  return getJson<DividendCalendarData>(`/api/dividend_calendar?export=${encodeURIComponent(exportName)}`);
 }
 
 export async function uploadExport(file: File): Promise<{ filename: string; exports: ExportName[] }> {

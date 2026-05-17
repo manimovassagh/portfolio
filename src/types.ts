@@ -1,6 +1,6 @@
 export type ExportName = string;
 
-export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax';
+export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance';
 export type ChartMode = 'Value' | 'TWR' | 'Drawdown';
 
 export type Summary = {
@@ -107,6 +107,34 @@ export type AssetDetail = {
     market_value: number | null;
     unrealized: number | null;
   };
+};
+
+export type GeographicData = {
+  countries: Array<{ code: string; name: string; value: number; pct: number }>;
+};
+
+export type FsaData = {
+  year: number;
+  limit: number;
+  used: number;
+  remaining: number;
+  breakdown: { dividends: number; interest: number; stockperks: number; realized_gains: number };
+};
+
+export type WatchlistItem = {
+  isin: string;
+  ticker: string;
+  name: string;
+  notes: string;
+  target_price: number | null;
+  added_date: string;
+  current_price: number | null;
+};
+
+export type WatchlistData = { items: WatchlistItem[] };
+
+export type DividendCalendarData = {
+  upcoming: Array<{ isin: string; name: string; last_dividend_date: string; last_amount: number }>;
 };
 
 export type DashboardData = {

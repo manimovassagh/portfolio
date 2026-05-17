@@ -8,6 +8,7 @@ Run with:  uv run uvicorn api:app --reload --port 8765
 """
 from __future__ import annotations
 
+import json
 import math
 import os
 from datetime import date, datetime
@@ -15,10 +16,12 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
+import yfinance as yf
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from pydantic import BaseModel
 
 from portfolio import benchmark, cash, loader, performance, positions, prices, returns
 
@@ -440,3 +443,215 @@ def get_sparklines(export: str | None = None):
     """Per-holding price sparkline for the last 90 days (pre-computed in cache)."""
     s = _state(export)
     return {"sparklines": s.get("spark_data", {})}
+
+
+# ── Geographic allocation ────────────────────────────────────────────
+
+COUNTRY_NAMES: dict[str, str] = {
+    "DE": "Germany",
+    "US": "United States",
+    "IE": "Ireland",
+    "LU": "Luxembourg",
+    "FR": "France",
+    "GB": "United Kingdom",
+    "NL": "Netherlands",
+    "SE": "Sweden",
+    "CH": "Switzerland",
+    "JP": "Japan",
+    "CN": "China",
+    "KY": "Cayman Islands",
+    "XS": "International",
+    "QS": "International",
+}
+
+
+@app.get("/api/geographic")
+def get_geographic(export: str | None = None):
+    """Portfolio allocation broken down by country, derived from ISIN prefix."""
+    s = _state(export)
+    holdings, live = s["holdings"], s["prices"]
+
+    country_values: dict[str, float] = {}
+    for isin, h in holdings.items():
+        code = isin[:2].upper()
+        price = live.get(isin)
+        mv = (price * h.shares) if price else h.cost_basis
+        country_values[code] = country_values.get(code, 0.0) + mv
+
+    total = sum(country_values.values()) or 1.0
+    countries = [
+        {
+            "code": code,
+            "name": COUNTRY_NAMES.get(code, code),
+            "value": _f(value),
+            "pct": _f(value / total * 100),
+        }
+        for code, value in country_values.items()
+    ]
+    countries.sort(key=lambda c: -(c["value"] or 0))
+    return {"countries": countries}
+
+
+# ── Freistellungsauftrag tracker ─────────────────────────────────────
+
+_FSA_LIMIT = 1000.0
+
+
+@app.get("/api/fsa")
+def get_fsa(export: str | None = None):
+    """German annual tax-free allowance (Freistellungsauftrag) usage tracker."""
+    s = _state(export)
+    df, realized = s["df"], s["realized"]
+
+    current_year = pd.Timestamp.now().year
+    df_year = df[df["date"].dt.year == current_year]
+
+    dividends = float(df_year[df_year["type"] == "Dividend"]["amount"].sum() or 0.0)
+    interest = float(
+        df_year[df_year["type"].isin(["Interest", "Interest_payout"])]["amount"].sum() or 0.0
+    )
+    stockperks = float(df_year[df_year["type"] == "Stock_perk"]["amount"].sum() or 0.0)
+    realized_gains = float(
+        sum(r.pnl for r in realized if pd.Timestamp(r.date).year == current_year and r.pnl > 0)
+    )
+
+    used = dividends + interest + stockperks + realized_gains
+    remaining = max(0.0, _FSA_LIMIT - used)
+
+    return {
+        "year": current_year,
+        "limit": _f(_FSA_LIMIT),
+        "used": _f(used),
+        "remaining": _f(remaining),
+        "breakdown": {
+            "dividends": _f(dividends),
+            "interest": _f(interest),
+            "stockperks": _f(stockperks),
+            "realized_gains": _f(realized_gains),
+        },
+    }
+
+
+# ── Dividend calendar ────────────────────────────────────────────────
+
+@app.get("/api/dividend_calendar")
+def get_dividend_calendar(export: str | None = None):
+    """Last dividend date and amount for each current holding via yfinance."""
+    s = _state(export)
+    holdings = s["holdings"]
+
+    isins = list(holdings.keys())
+    ticker_map = prices.resolve_tickers(isins)  # ISIN → Yahoo ticker
+
+    upcoming = []
+    for isin, h in holdings.items():
+        ticker = ticker_map.get(isin)
+        if not ticker:
+            continue
+        try:
+            fi = yf.Ticker(ticker).fast_info
+            last_div_value = fi.get("last_dividend_value") if hasattr(fi, "get") else getattr(fi, "last_dividend_value", None)
+            last_div_date = fi.get("last_dividend_date") if hasattr(fi, "get") else getattr(fi, "last_dividend_date", None)
+
+            if not last_div_value or last_div_value <= 0:
+                continue
+
+            # Normalise date to a string
+            if last_div_date is not None:
+                try:
+                    date_str = pd.Timestamp(last_div_date).strftime("%Y-%m-%d")
+                except Exception:
+                    date_str = str(last_div_date)
+            else:
+                date_str = None
+
+            upcoming.append(
+                {
+                    "isin": isin,
+                    "name": h.name,
+                    "last_dividend_date": date_str,
+                    "last_amount": _f(last_div_value),
+                }
+            )
+        except Exception:
+            continue
+
+    # Sort by last_dividend_date descending, None values last
+    upcoming.sort(key=lambda x: x["last_dividend_date"] or "", reverse=True)
+    return {"upcoming": upcoming}
+
+
+# ── Watchlist CRUD ───────────────────────────────────────────────────
+
+_WATCHLIST_FILE = BASE_DIR / "watchlist.json"
+
+
+def _load_watchlist() -> list[dict]:
+    if not _WATCHLIST_FILE.exists():
+        return []
+    try:
+        return json.loads(_WATCHLIST_FILE.read_text())
+    except (json.JSONDecodeError, OSError):
+        return []
+
+
+def _save_watchlist(items: list[dict]) -> None:
+    _WATCHLIST_FILE.write_text(json.dumps(items, indent=2, sort_keys=False))
+
+
+def _enrich_watchlist(items: list[dict]) -> list[dict]:
+    """Add current_price to each watchlist item."""
+    if not items:
+        return []
+    isins = [item["isin"] for item in items]
+    try:
+        live = prices.fetch_prices(isins)
+    except Exception:
+        live = {}
+    enriched = []
+    for item in items:
+        enriched.append({**item, "current_price": _f(live.get(item["isin"]))})
+    return enriched
+
+
+class WatchlistAddRequest(BaseModel):
+    isin: str
+    ticker: str
+    name: str
+    notes: str = ""
+    target_price: float | None = None
+
+
+@app.get("/api/watchlist")
+def get_watchlist():
+    """Return current watchlist with live prices."""
+    items = _load_watchlist()
+    return {"items": _enrich_watchlist(items)}
+
+
+@app.post("/api/watchlist")
+def add_watchlist(body: WatchlistAddRequest):
+    """Add a new item to the watchlist (deduped by ISIN)."""
+    items = _load_watchlist()
+    if not any(i["isin"] == body.isin for i in items):
+        items.append(
+            {
+                "isin": body.isin,
+                "ticker": body.ticker,
+                "name": body.name,
+                "notes": body.notes,
+                "target_price": body.target_price,
+                "added_date": date.today().isoformat(),
+            }
+        )
+        _save_watchlist(items)
+    return {"items": _enrich_watchlist(items)}
+
+
+@app.delete("/api/watchlist/{isin}")
+def delete_watchlist(isin: str):
+    """Remove an item from the watchlist by ISIN."""
+    items = _load_watchlist()
+    items = [i for i in items if i["isin"] != isin]
+    _save_watchlist(items)
+    return {"items": _enrich_watchlist(items)}

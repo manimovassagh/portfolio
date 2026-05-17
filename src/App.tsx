@@ -15,14 +15,16 @@ import {
   PiggyBank,
   Receipt,
   RefreshCw,
+  Sliders,
+  Star,
   Sun,
   Upload,
   Wallet,
   X,
 } from 'lucide-react';
-import { listExports, loadAsset, loadDashboard, uploadExport } from './api';
+import { addWatchlistItem, fetchDividendCalendar, fetchFsa, fetchGeographic, fetchWatchlist, listExports, loadAsset, loadDashboard, removeWatchlistItem, uploadExport } from './api';
 import type { ApexOptions } from 'apexcharts';
-import type { AssetDetail, ChartMode, DashboardData, Holding, SectionId } from './types';
+import type { AssetDetail, ChartMode, DashboardData, DividendCalendarData, ExportName, FsaData, GeographicData, Holding, SectionId, WatchlistData, WatchlistItem } from './types';
 
 const sections: Array<{ id: SectionId; label: string; icon: typeof LayoutDashboard }> = [
   { id: 'overview', label: 'Overview', icon: LayoutDashboard },
