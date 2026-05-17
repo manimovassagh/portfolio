@@ -8,7 +8,6 @@ Run with:  uv run uvicorn api:app --reload --port 8765
 """
 from __future__ import annotations
 
-import json
 import math
 import os
 from datetime import date, datetime
@@ -23,7 +22,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 
-from portfolio import benchmark, cash, loader, performance, positions, prices, returns
+from portfolio import benchmark, cash, db, loader, performance, positions, prices, returns
 
 
 def _f(v):
@@ -42,6 +41,7 @@ BASE_DIR = Path(__file__).resolve().parent
 app = FastAPI(title="Trade Republic Portfolio")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
+db.init(BASE_DIR / "portfolio.db")
 
 
 # ── Data cache: load CSV + prices once per export file ──────────────
@@ -445,6 +445,52 @@ def get_sparklines(export: str | None = None):
     return {"sparklines": s.get("spark_data", {})}
 
 
+# ── Response models for new endpoints ───────────────────────────────
+
+class CountryAllocation(BaseModel):
+    code: str
+    name: str
+    value: float | None
+    pct: float | None
+
+class GeographicResponse(BaseModel):
+    countries: list[CountryAllocation]
+
+class FsaBreakdown(BaseModel):
+    dividends: float | None
+    interest: float | None
+    stockperks: float | None
+    realized_gains: float | None
+
+class FsaResponse(BaseModel):
+    year: int
+    limit: float
+    used: float | None
+    remaining: float | None
+    breakdown: FsaBreakdown
+
+class DividendEntry(BaseModel):
+    isin: str
+    name: str
+    last_dividend_date: str | None
+    last_amount: float | None
+
+class DividendCalendarResponse(BaseModel):
+    upcoming: list[DividendEntry]
+
+class WatchlistItem(BaseModel):
+    isin: str
+    ticker: str
+    name: str
+    notes: str
+    target_price: float | None
+    added_date: str
+    current_price: float | None
+
+class WatchlistResponse(BaseModel):
+    items: list[WatchlistItem]
+
+
 # ── Geographic allocation ────────────────────────────────────────────
 
 COUNTRY_NAMES: dict[str, str] = {
@@ -465,8 +511,8 @@ COUNTRY_NAMES: dict[str, str] = {
 }
 
 
-@app.get("/api/geographic")
-def get_geographic(export: str | None = None):
+@app.get("/api/geographic", response_model=GeographicResponse)
+def get_geographic(export: str | None = None) -> GeographicResponse:
     """Portfolio allocation broken down by country, derived from ISIN prefix."""
     s = _state(export)
     holdings, live = s["holdings"], s["prices"]
@@ -479,17 +525,17 @@ def get_geographic(export: str | None = None):
         country_values[code] = country_values.get(code, 0.0) + mv
 
     total = sum(country_values.values()) or 1.0
-    countries = [
-        {
-            "code": code,
-            "name": COUNTRY_NAMES.get(code, code),
-            "value": _f(value),
-            "pct": _f(value / total * 100),
-        }
+    rows = [
+        CountryAllocation(
+            code=code,
+            name=COUNTRY_NAMES.get(code, code),
+            value=_f(value),
+            pct=_f(value / total * 100),
+        )
         for code, value in country_values.items()
     ]
-    countries.sort(key=lambda c: -(c["value"] or 0))
-    return {"countries": countries}
+    rows.sort(key=lambda c: -(c.value or 0))
+    return GeographicResponse(countries=rows)
 
 
 # ── Freistellungsauftrag tracker ─────────────────────────────────────
@@ -497,8 +543,8 @@ def get_geographic(export: str | None = None):
 _FSA_LIMIT = 1000.0
 
 
-@app.get("/api/fsa")
-def get_fsa(export: str | None = None):
+@app.get("/api/fsa", response_model=FsaResponse)
+def get_fsa(export: str | None = None) -> FsaResponse:
     """German annual tax-free allowance (Freistellungsauftrag) usage tracker."""
     s = _state(export)
     df, realized = s["df"], s["realized"]
@@ -518,32 +564,32 @@ def get_fsa(export: str | None = None):
     used = dividends + interest + stockperks + realized_gains
     remaining = max(0.0, _FSA_LIMIT - used)
 
-    return {
-        "year": current_year,
-        "limit": _f(_FSA_LIMIT),
-        "used": _f(used),
-        "remaining": _f(remaining),
-        "breakdown": {
-            "dividends": _f(dividends),
-            "interest": _f(interest),
-            "stockperks": _f(stockperks),
-            "realized_gains": _f(realized_gains),
-        },
-    }
+    return FsaResponse(
+        year=current_year,
+        limit=_FSA_LIMIT,
+        used=_f(used),
+        remaining=_f(remaining),
+        breakdown=FsaBreakdown(
+            dividends=_f(dividends),
+            interest=_f(interest),
+            stockperks=_f(stockperks),
+            realized_gains=_f(realized_gains),
+        ),
+    )
 
 
 # ── Dividend calendar ────────────────────────────────────────────────
 
-@app.get("/api/dividend_calendar")
-def get_dividend_calendar(export: str | None = None):
+@app.get("/api/dividend_calendar", response_model=DividendCalendarResponse)
+def get_dividend_calendar(export: str | None = None) -> DividendCalendarResponse:
     """Last dividend date and amount for each current holding via yfinance."""
     s = _state(export)
     holdings = s["holdings"]
 
     isins = list(holdings.keys())
-    ticker_map = prices.resolve_tickers(isins)  # ISIN → Yahoo ticker
+    ticker_map = prices.resolve_tickers(isins)
 
-    upcoming = []
+    upcoming: list[DividendEntry] = []
     for isin, h in holdings.items():
         ticker = ticker_map.get(isin)
         if not ticker:
@@ -556,62 +602,49 @@ def get_dividend_calendar(export: str | None = None):
             if not last_div_value or last_div_value <= 0:
                 continue
 
-            # Normalise date to a string
+            date_str: str | None = None
             if last_div_date is not None:
                 try:
                     date_str = pd.Timestamp(last_div_date).strftime("%Y-%m-%d")
                 except Exception:
                     date_str = str(last_div_date)
-            else:
-                date_str = None
 
-            upcoming.append(
-                {
-                    "isin": isin,
-                    "name": h.name,
-                    "last_dividend_date": date_str,
-                    "last_amount": _f(last_div_value),
-                }
-            )
+            upcoming.append(DividendEntry(
+                isin=isin,
+                name=h.name,
+                last_dividend_date=date_str,
+                last_amount=_f(last_div_value),
+            ))
         except Exception:
             continue
 
-    # Sort by last_dividend_date descending, None values last
-    upcoming.sort(key=lambda x: x["last_dividend_date"] or "", reverse=True)
-    return {"upcoming": upcoming}
+    upcoming.sort(key=lambda x: x.last_dividend_date or "", reverse=True)
+    return DividendCalendarResponse(upcoming=upcoming)
 
 
 # ── Watchlist CRUD ───────────────────────────────────────────────────
 
-_WATCHLIST_FILE = BASE_DIR / "watchlist.json"
-
-
-def _load_watchlist() -> list[dict]:
-    if not _WATCHLIST_FILE.exists():
+def _enrich_watchlist(rows: list[db.WatchlistRow]) -> list[WatchlistItem]:
+    """Attach live price to each watchlist row."""
+    if not rows:
         return []
-    try:
-        return json.loads(_WATCHLIST_FILE.read_text())
-    except (json.JSONDecodeError, OSError):
-        return []
-
-
-def _save_watchlist(items: list[dict]) -> None:
-    _WATCHLIST_FILE.write_text(json.dumps(items, indent=2, sort_keys=False))
-
-
-def _enrich_watchlist(items: list[dict]) -> list[dict]:
-    """Add current_price to each watchlist item."""
-    if not items:
-        return []
-    isins = [item["isin"] for item in items]
+    isins = [r.isin for r in rows]
     try:
         live = prices.fetch_prices(isins)
     except Exception:
         live = {}
-    enriched = []
-    for item in items:
-        enriched.append({**item, "current_price": _f(live.get(item["isin"]))})
-    return enriched
+    return [
+        WatchlistItem(
+            isin=r.isin,
+            ticker=r.ticker,
+            name=r.name,
+            notes=r.notes,
+            target_price=r.target_price,
+            added_date=r.added_date,
+            current_price=_f(live.get(r.isin)),
+        )
+        for r in rows
+    ]
 
 
 class WatchlistAddRequest(BaseModel):
@@ -622,36 +655,18 @@ class WatchlistAddRequest(BaseModel):
     target_price: float | None = None
 
 
-@app.get("/api/watchlist")
-def get_watchlist():
-    """Return current watchlist with live prices."""
-    items = _load_watchlist()
-    return {"items": _enrich_watchlist(items)}
+@app.get("/api/watchlist", response_model=WatchlistResponse)
+def get_watchlist() -> WatchlistResponse:
+    return WatchlistResponse(items=_enrich_watchlist(db.list_watchlist()))
 
 
-@app.post("/api/watchlist")
-def add_watchlist(body: WatchlistAddRequest):
-    """Add a new item to the watchlist (deduped by ISIN)."""
-    items = _load_watchlist()
-    if not any(i["isin"] == body.isin for i in items):
-        items.append(
-            {
-                "isin": body.isin,
-                "ticker": body.ticker,
-                "name": body.name,
-                "notes": body.notes,
-                "target_price": body.target_price,
-                "added_date": date.today().isoformat(),
-            }
-        )
-        _save_watchlist(items)
-    return {"items": _enrich_watchlist(items)}
+@app.post("/api/watchlist", response_model=WatchlistResponse)
+def add_watchlist(body: WatchlistAddRequest) -> WatchlistResponse:
+    db.add_watchlist_item(body.isin, body.ticker, body.name, body.notes, body.target_price)
+    return WatchlistResponse(items=_enrich_watchlist(db.list_watchlist()))
 
 
-@app.delete("/api/watchlist/{isin}")
-def delete_watchlist(isin: str):
-    """Remove an item from the watchlist by ISIN."""
-    items = _load_watchlist()
-    items = [i for i in items if i["isin"] != isin]
-    _save_watchlist(items)
-    return {"items": _enrich_watchlist(items)}
+@app.delete("/api/watchlist/{isin}", response_model=WatchlistResponse)
+def delete_watchlist(isin: str) -> WatchlistResponse:
+    db.remove_watchlist_item(isin)
+    return WatchlistResponse(items=_enrich_watchlist(db.list_watchlist()))
