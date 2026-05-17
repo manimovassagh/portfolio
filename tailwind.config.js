@@ -1,6 +1,6 @@
 export default {
   darkMode: 'class',
-  content: ['./templates/**/*.html', './src/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {
