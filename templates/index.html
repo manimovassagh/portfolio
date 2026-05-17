@@ -7,7 +7,7 @@
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
 
   <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
   <script>
@@ -16,7 +16,7 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
+            sans: ['Syne', 'system-ui', 'sans-serif'],
             mono: ['JetBrains Mono', 'ui-monospace', 'monospace'],
           },
           colors: {
@@ -37,59 +37,78 @@
   <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 
   <style>
-    html, body { font-feature-settings: "cv11","ss01","ss03"; }
+    html, body { font-feature-settings: "ss01","ss03","cv11"; }
     body { font-variant-numeric: tabular-nums; }
-    .num { font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+    .num { font-family: 'JetBrains Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; letter-spacing: -0.03em; }
     .mono { font-family: 'JetBrains Mono', ui-monospace, monospace; font-size: 0.7rem; }
 
-    /* ── Cards ───────────────────────────────────── */
+    /* ── Cards — solid dark glass ────────────────── */
     .card {
-      background: rgba(255,255,255,0.78);
-      backdrop-filter: blur(16px);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.04);
+      background: linear-gradient(145deg, rgba(20,20,32,0.97) 0%, rgba(13,13,21,0.99) 100%);
+      border: 1px solid rgba(255,255,255,0.07);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.8), 0 8px 32px rgba(0,0,0,0.4),
+                  inset 0 1px 0 rgba(255,255,255,0.04);
     }
-    .dark .card {
-      background: rgba(24,24,27,0.7);
-      box-shadow: 0 1px 3px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.25);
-    }
-    /* Accent bar: colored left border for card type */
-    .card-gain  { border-left: 3px solid #10b981; }
-    .card-loss  { border-left: 3px solid #f43f5e; }
-    .card-perf  { border-left: 3px solid #6366f1; }
-    .card-warn  { border-left: 3px solid #f59e0b; }
-    .card-neutral { border-left: 3px solid #52525b; }
-    /* Hero card glow */
-    .card-hero {
-      box-shadow: 0 0 0 1px rgba(16,185,129,0.12), 0 8px 32px rgba(16,185,129,0.08), 0 2px 8px rgba(0,0,0,0.06);
-    }
-    .dark .card-hero {
-      box-shadow: 0 0 0 1px rgba(16,185,129,0.15), 0 8px 40px rgba(16,185,129,0.10), 0 2px 8px rgba(0,0,0,0.4);
+    html:not(.dark) .card {
+      background: rgba(255,255,255,0.94);
+      border: 1px solid rgba(0,0,0,0.07);
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 6px 24px rgba(0,0,0,0.07);
     }
 
-    /* ── Mesh gradient background ────────────────── */
+    /* ── Accent bars with diagonal color wash ─────── */
+    .card-gain    { border-left: 2px solid #10b981; background: linear-gradient(135deg, rgba(16,185,129,0.12) 0%, rgba(13,13,21,0.99) 55%); }
+    .card-loss    { border-left: 2px solid #f43f5e; background: linear-gradient(135deg, rgba(244,63,94,0.12) 0%, rgba(13,13,21,0.99) 55%); }
+    .card-perf    { border-left: 2px solid #818cf8; background: linear-gradient(135deg, rgba(129,140,248,0.12) 0%, rgba(13,13,21,0.99) 55%); }
+    .card-warn    { border-left: 2px solid #fbbf24; background: linear-gradient(135deg, rgba(251,191,36,0.11) 0%, rgba(13,13,21,0.99) 55%); }
+    .card-neutral { border-left: 2px solid rgba(255,255,255,0.12); }
+    html:not(.dark) .card-gain    { background: linear-gradient(135deg, rgba(16,185,129,0.07) 0%, rgba(255,255,255,0.97) 55%); }
+    html:not(.dark) .card-loss    { background: linear-gradient(135deg, rgba(244,63,94,0.07) 0%, rgba(255,255,255,0.97) 55%); }
+    html:not(.dark) .card-perf    { background: linear-gradient(135deg, rgba(99,102,241,0.08) 0%, rgba(255,255,255,0.97) 55%); }
+    html:not(.dark) .card-warn    { background: linear-gradient(135deg, rgba(245,158,11,0.07) 0%, rgba(255,255,255,0.97) 55%); }
+    html:not(.dark) .card-neutral { border-left-color: #d4d4d8; }
+
+    /* ── Hero glow ──────────────────────────────── */
+    .card-hero {
+      border-color: rgba(16,185,129,0.25) !important;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.12), 0 4px 16px rgba(0,0,0,0.6),
+                  0 24px 64px rgba(16,185,129,0.07), inset 0 1px 0 rgba(16,185,129,0.07);
+    }
+    html:not(.dark) .card-hero {
+      border-color: rgba(16,185,129,0.22) !important;
+      box-shadow: 0 0 0 1px rgba(16,185,129,0.14), 0 8px 32px rgba(16,185,129,0.08), 0 2px 6px rgba(0,0,0,0.04);
+    }
+
+    /* ── Glowing numbers (dark only) ─────────────── */
+    .dark .glow-green  { text-shadow: 0 0 18px rgba(16,185,129,0.6),  0 0 36px rgba(16,185,129,0.22); }
+    .dark .glow-rose   { text-shadow: 0 0 18px rgba(244,63,94,0.6),   0 0 36px rgba(244,63,94,0.22); }
+    .dark .glow-indigo { text-shadow: 0 0 18px rgba(129,140,248,0.6), 0 0 36px rgba(129,140,248,0.22); }
+
+    /* ── Aurora mesh ─────────────────────────────── */
     .mesh-bg {
       position: fixed; inset: 0; z-index: -1; pointer-events: none;
       background:
-        radial-gradient(at 15% 0%,   rgba(16,185,129,0.07) 0%, transparent 55%),
-        radial-gradient(at 85% 100%, rgba(99,102,241,0.09) 0%, transparent 55%),
-        radial-gradient(at 100% 15%, rgba(244,63,94,0.05)  0%, transparent 50%),
-        radial-gradient(at 40% 60%,  rgba(245,158,11,0.04) 0%, transparent 40%);
+        radial-gradient(ellipse 80% 55% at 8% -5%,   rgba(16,185,129,0.20) 0%, transparent 60%),
+        radial-gradient(ellipse 65% 65% at 92% 108%,  rgba(99,102,241,0.25) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 55% at 96% 8%,    rgba(244,63,94,0.12)  0%, transparent 50%),
+        radial-gradient(ellipse 60% 45% at 38% 72%,   rgba(245,158,11,0.10) 0%, transparent 45%),
+        radial-gradient(ellipse 70% 45% at 62% 22%,   rgba(6,182,212,0.11)  0%, transparent 45%);
     }
     html:not(.dark) .mesh-bg {
       background:
-        radial-gradient(at 15% 0%,   rgba(16,185,129,0.09) 0%, transparent 60%),
-        radial-gradient(at 85% 100%, rgba(99,102,241,0.09) 0%, transparent 55%),
-        radial-gradient(at 100% 15%, rgba(244,63,94,0.05)  0%, transparent 50%),
-        radial-gradient(at 40% 60%,  rgba(245,158,11,0.04) 0%, transparent 40%);
+        radial-gradient(ellipse 80% 55% at 5% -5%,    rgba(16,185,129,0.11) 0%, transparent 60%),
+        radial-gradient(ellipse 65% 65% at 95% 112%,  rgba(99,102,241,0.11) 0%, transparent 60%),
+        radial-gradient(ellipse 55% 55% at 98% 5%,    rgba(244,63,94,0.07)  0%, transparent 50%),
+        radial-gradient(ellipse 60% 45% at 40% 72%,   rgba(245,158,11,0.06) 0%, transparent 45%),
+        radial-gradient(ellipse 70% 45% at 65% 25%,   rgba(6,182,212,0.07)  0%, transparent 45%);
     }
 
     /* ── Scrollbar ───────────────────────────────── */
-    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
     ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { background: rgb(63 63 70 / 0.4); border-radius: 8px; }
-    ::-webkit-scrollbar-thumb:hover { background: rgb(82 82 91 / 0.6); }
+    ::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 8px; }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,0.5); }
 
-    /* ── Skeleton shimmer ────────────────────────── */
+    /* ── Skeleton ────────────────────────────────── */
     @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
     .skeleton {
       background: linear-gradient(90deg, rgb(39 39 42/0.4) 25%, rgb(63 63 70/0.5) 50%, rgb(39 39 42/0.4) 75%);
@@ -100,25 +119,29 @@
       background-size: 200% 100%;
     }
 
-    /* ── Spark + table ───────────────────────────── */
+    /* ── Table ───────────────────────────────────── */
     .spark { height: 32px; width: 100px; }
-    .tr-hover { transition: border-left-color 0.15s; border-left: 3px solid transparent; }
-    .tr-hover:hover { border-left-color: #10b981; background: rgba(16,185,129,0.03); }
-    .dark .tr-hover:hover { background: rgba(16,185,129,0.05); }
+    .tr-hover { transition: border-left-color 0.12s, background 0.12s; border-left: 3px solid transparent; }
+    .tr-hover:hover { border-left-color: #10b981; background: rgba(16,185,129,0.04); }
+    .dark .tr-hover:hover { background: rgba(16,185,129,0.06); }
 
-    /* ── Animated number counter ─────────────────── */
-    @keyframes countUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-    .kpi-value { animation: countUp 0.5s ease-out both; }
+    /* ── KPI pop-in with bounce ──────────────────── */
+    @keyframes countUp {
+      from { opacity: 0; transform: translateY(10px) scale(0.96); }
+      to   { opacity: 1; transform: translateY(0)   scale(1); }
+    }
+    .kpi-value { animation: countUp 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
 
-    /* ── Section transition ──────────────────────── */
-    .section-enter { animation: fadeUp 0.35s ease-out; }
-    @keyframes fadeUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    /* ── Section fade-up ─────────────────────────── */
+    .section-enter { animation: fadeUp 0.3s ease-out; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
 
-    /* ── Nav active indicator ────────────────────── */
+    /* ── Nav active — glowing indicator ─────────── */
     .nav-active { position: relative; }
     .nav-active::before {
       content: ''; position: absolute; left: 0; top: 50%; transform: translateY(-50%);
-      width: 3px; height: 60%; background: #10b981; border-radius: 0 2px 2px 0;
+      width: 3px; height: 60%; background: #10b981; border-radius: 0 3px 3px 0;
+      box-shadow: 0 0 10px rgba(16,185,129,0.8);
     }
 
     [x-cloak] { display: none !important; }
@@ -133,24 +156,27 @@
   <div class="flex min-h-screen">
 
     <!-- Sidebar -->
-    <aside class="hidden lg:flex lg:flex-col w-60 shrink-0 border-r border-ink-200/60 dark:border-ink-800/60 bg-white/30 dark:bg-ink-950/30 backdrop-blur-xl sticky top-0 h-screen">
-      <div class="px-5 py-5 border-b border-ink-200/60 dark:border-ink-800/60">
+    <aside class="hidden lg:flex lg:flex-col w-60 shrink-0 border-r border-black/20 bg-ink-950 sticky top-0 h-screen relative overflow-hidden">
+      <!-- Sidebar aurora orb -->
+      <div class="absolute -top-16 -left-16 w-48 h-48 rounded-full pointer-events-none" style="background:radial-gradient(circle,rgba(16,185,129,0.18) 0%,transparent 70%);filter:blur(24px)"></div>
+      <div class="absolute bottom-0 right-0 w-36 h-36 rounded-full pointer-events-none" style="background:radial-gradient(circle,rgba(99,102,241,0.15) 0%,transparent 70%);filter:blur(20px)"></div>
+      <div class="px-5 py-5 border-b border-white/8 relative">
         <div class="flex items-center gap-3">
-          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/20 shrink-0">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-lg shadow-emerald-500/30 shrink-0">
             <i data-lucide="trending-up" class="w-4 h-4 text-white stroke-[2.5]"></i>
           </div>
           <div class="min-w-0">
-            <div class="text-sm font-bold tracking-tight">Kapital</div>
-            <div class="text-[11px] text-ink-500 dark:text-ink-400 font-medium">Trade Republic</div>
+            <div class="text-sm font-bold tracking-tight text-white">Kapital</div>
+            <div class="text-[11px] text-ink-400 font-medium">Trade Republic</div>
           </div>
         </div>
         <!-- Holder name -->
         <div x-show="holderName" class="mt-4 flex items-center gap-2.5">
-          <div class="w-7 h-7 rounded-full bg-ink-200 dark:bg-ink-700 flex items-center justify-center shrink-0 text-[11px] font-bold text-ink-600 dark:text-ink-300"
+          <div class="w-7 h-7 rounded-full bg-emerald-500/20 border border-emerald-500/30 flex items-center justify-center shrink-0 text-[11px] font-bold text-emerald-400"
                x-text="holderName ? holderName.split(' ').map(w=>w[0]).slice(0,2).join('') : ''"></div>
           <div class="min-w-0">
-            <div class="text-xs font-semibold truncate" x-text="holderName"></div>
-            <div class="text-[10px] text-ink-500 dark:text-ink-400">Account holder</div>
+            <div class="text-xs font-semibold truncate text-ink-100" x-text="holderName"></div>
+            <div class="text-[10px] text-ink-500">Account holder</div>
           </div>
         </div>
       </div>
@@ -159,18 +185,18 @@
         <template x-for="item in sections" :key="item.id">
           <button @click="navigate(item.id)"
              :class="active === item.id
-               ? 'nav-active bg-emerald-500/8 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
-               : 'text-ink-500 dark:text-ink-400 hover:bg-ink-900/[0.04] dark:hover:bg-white/[0.04] hover:text-ink-900 dark:hover:text-white'"
+               ? 'nav-active bg-emerald-500/10 text-emerald-400'
+               : 'text-ink-500 hover:bg-white/5 hover:text-ink-200'"
              class="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg font-medium transition-colors text-sm">
-            <i :data-lucide="item.icon" class="w-4 h-4 stroke-[1.75]" :class="active === item.id ? 'text-emerald-500' : ''"></i>
+            <i :data-lucide="item.icon" class="w-4 h-4 stroke-[1.75]" :class="active === item.id ? 'text-emerald-400' : ''"></i>
             <span x-text="item.label"></span>
           </button>
         </template>
       </nav>
 
-      <div class="px-3 py-3 border-t border-ink-200/60 dark:border-ink-800/60 space-y-1">
+      <div class="px-3 py-3 border-t border-white/8 space-y-1">
         <button @click="toggleTheme()"
-                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-ink-600 dark:text-ink-400 hover:bg-ink-900/[0.03] dark:hover:bg-white/[0.03] hover:text-ink-900 dark:hover:text-white transition-colors">
+                class="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium text-ink-500 hover:bg-white/5 hover:text-ink-200 transition-colors">
           <i :data-lucide="dark ? 'sun' : 'moon'" class="w-4 h-4 stroke-[2]"></i>
           <span x-text="dark ? 'Light mode' : 'Dark mode'"></span>
         </button>
@@ -274,38 +300,18 @@
           <!-- Rolling returns strip -->
           <div class="grid grid-cols-5 gap-2">
             <template x-for="r in rollingReturns" :key="r.label">
-              <div class="card rounded-xl px-3 py-3 text-center flex flex-col items-center gap-1">
+              <div class="card rounded-xl px-3 py-3 text-center flex flex-col items-center gap-1.5"
+                   :class="r.pct === null ? 'card-neutral' : r.pct >= 0 ? 'card-gain' : 'card-loss'">
                 <div class="text-[9px] font-semibold uppercase tracking-widest text-ink-400 dark:text-ink-500" x-text="r.label"></div>
                 <div class="num text-base font-bold leading-none"
                      :class="r.pct === null ? 'text-ink-400' : r.pct >= 0 ? 'text-emerald-500' : 'text-rose-500'"
                      x-text="r.pct !== null ? (r.pct >= 0 ? '+' : '') + r.pct.toFixed(2) + '%' : '—'"></div>
-                <div class="w-full h-0.5 rounded-full overflow-hidden bg-ink-200/50 dark:bg-ink-800/50">
+                <div class="w-full h-0.5 rounded-full overflow-hidden bg-black/10 dark:bg-white/10">
                   <div class="h-full rounded-full transition-all"
                        :style="`width:${r.pct !== null ? Math.min(100, Math.abs(r.pct) * 4) : 0}%;background:${(r.pct ?? 0) >= 0 ? '#10b981' : '#f43f5e'}`"></div>
                 </div>
               </div>
             </template>
-          </div>
-
-          <!-- Hero chart: portfolio vs benchmark -->
-          <div class="card card-hero rounded-xl p-5">
-            <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
-              <div>
-                <h2 class="text-sm font-semibold tracking-tight">Portfolio performance</h2>
-                <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">vs your deposits and a passive MSCI World investment</p>
-              </div>
-              <div class="flex items-center gap-1 p-0.5 rounded-lg bg-ink-100 dark:bg-ink-900 border border-ink-200/60 dark:border-ink-800/60">
-                <template x-for="m in ['Value','TWR','Drawdown']" :key="m">
-                  <button @click="chartMode = m; renderHeroChart()"
-                          :class="chartMode === m
-                            ? 'bg-white dark:bg-ink-800 text-ink-900 dark:text-white shadow-sm'
-                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'"
-                          class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors"
-                          x-text="m"></button>
-                </template>
-              </div>
-            </div>
-            <div id="hero-chart" class="mt-4 -ml-3"></div>
           </div>
 
           <!-- Two-column: allocation + top movers -->
@@ -345,6 +351,27 @@
                 </template>
               </div>
             </div>
+          </div>
+
+          <!-- Hero chart: portfolio vs benchmark -->
+          <div class="card card-hero rounded-xl p-5">
+            <div class="flex flex-wrap items-center justify-between gap-3 mb-1">
+              <div>
+                <h2 class="text-sm font-semibold tracking-tight">Portfolio performance</h2>
+                <p class="text-xs text-ink-500 dark:text-ink-400 mt-0.5">vs your deposits and a passive MSCI World investment</p>
+              </div>
+              <div class="flex items-center gap-1 p-0.5 rounded-lg bg-ink-100 dark:bg-ink-900 border border-ink-200/60 dark:border-ink-800/60">
+                <template x-for="m in ['Value','TWR','Drawdown']" :key="m">
+                  <button @click="chartMode = m; renderHeroChart()"
+                          :class="chartMode === m
+                            ? 'bg-white dark:bg-ink-800 text-ink-900 dark:text-white shadow-sm'
+                            : 'text-ink-600 dark:text-ink-400 hover:text-ink-900 dark:hover:text-white'"
+                          class="px-2.5 py-1 text-xs font-medium rounded-md transition-colors"
+                          x-text="m"></button>
+                </template>
+              </div>
+            </div>
+            <div id="hero-chart" class="mt-4 -ml-3"></div>
           </div>
 
           <!-- Best & worst days -->

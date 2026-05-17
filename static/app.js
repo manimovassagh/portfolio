@@ -218,7 +218,7 @@ function dashboard() {
           deltaClass: s.unrealized_pnl >= 0 ? 'text-emerald-500' : 'text-rose-500',
           deltaIcon: s.unrealized_pnl >= 0 ? 'arrow-up-right' : 'arrow-down-right',
           icon: 'trending-up',
-          colorClass: s.unrealized_pnl >= 0 ? 'text-emerald-500' : 'text-rose-500',
+          colorClass: s.unrealized_pnl >= 0 ? 'text-emerald-500 glow-green' : 'text-rose-500 glow-rose',
           accentClass: s.unrealized_pnl >= 0 ? 'card-gain' : 'card-loss',
         },
         {
@@ -226,14 +226,14 @@ function dashboard() {
           value: (s.realized_pnl >= 0 ? '+' : '') + fmt(s.realized_pnl),
           delta: s.n_realized + ' closed trade' + (s.n_realized === 1 ? '' : 's'),
           deltaClass: 'text-ink-500', deltaIcon: 'check', icon: 'check-circle-2',
-          colorClass: s.realized_pnl >= 0 ? 'text-emerald-500' : 'text-rose-500',
+          colorClass: s.realized_pnl >= 0 ? 'text-emerald-500 glow-green' : 'text-rose-500 glow-rose',
           accentClass: s.realized_pnl >= 0 ? 'card-gain' : 'card-neutral',
         },
         {
           label: 'XIRR (annualized)',
           value: s.xirr !== null && s.xirr !== undefined ? pct(s.xirr) : '—',
           delta: 'money-weighted return', deltaClass: 'text-ink-500', deltaIcon: 'percent', icon: 'activity',
-          colorClass: (s.xirr ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500',
+          colorClass: (s.xirr ?? 0) >= 0 ? 'text-emerald-500 glow-green' : 'text-rose-500 glow-rose',
           accentClass: 'card-perf',
         },
         {
@@ -296,11 +296,11 @@ function dashboard() {
     apexTheme() {
       const dark = this.dark;
       return {
-        chart: { foreColor: dark ? '#a1a1aa' : '#52525b', background: 'transparent', toolbar: { show: false }, animations: { speed: 350 } },
+        chart: { foreColor: dark ? '#52525b' : '#52525b', background: 'transparent', toolbar: { show: false }, animations: { speed: 400, easing: 'easeinout' } },
         tooltip: { theme: dark ? 'dark' : 'light' },
-        grid: { borderColor: dark ? '#27272a' : '#e4e4e7', strokeDashArray: 3, padding: { left: 8, right: 8 } },
-        xaxis: { axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { fontSize: '11px' } } },
-        yaxis: { labels: { style: { fontSize: '11px' } } },
+        grid: { borderColor: dark ? '#16161f' : '#e4e4e7', strokeDashArray: 4, padding: { left: 8, right: 8 } },
+        xaxis: { axisBorder: { show: false }, axisTicks: { show: false }, labels: { style: { fontSize: '10px', fontFamily: 'JetBrains Mono' } } },
+        yaxis: { labels: { style: { fontSize: '10px', fontFamily: 'JetBrains Mono' } } },
       };
     },
 
