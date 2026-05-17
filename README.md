@@ -67,6 +67,33 @@ Open **http://127.0.0.1:8765** — the sample portfolio loads automatically.
 
 ---
 
+## Run with Docker (HTTP + HTTPS)
+
+**Prerequisites:** [Docker](https://docs.docker.com/get-docker/) with Compose
+
+```bash
+docker compose up --build
+```
+
+| URL | What |
+|---|---|
+| `http://localhost` | Redirects to HTTPS automatically |
+| `https://localhost` | App with self-signed TLS cert |
+
+The Nginx image generates a self-signed certificate for `localhost` at build time.
+Your browser will show a security warning on first visit — click **Advanced → Proceed** to accept it.
+
+To use a real domain with an auto-provisioned Let's Encrypt cert, change the `server_name` in `nginx/nginx.conf` and remove the `ssl_certificate`/`ssl_certificate_key` directives — Nginx + Certbot handles the rest.
+
+**Volumes:**
+
+| Mount | Purpose |
+|---|---|
+| `./exports` | Drop CSV exports here; survives container restarts |
+| `kapital-db` (named) | SQLite watchlist — persisted across restarts |
+
+---
+
 ## Import your own data
 
 1. In the Trade Republic app: **Profile → Documents → Transaction history → Export**

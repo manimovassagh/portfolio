@@ -1,0 +1,16 @@
+.git
+node_modules
+.venv
+static/dist
+exports/Transaction*
+exports/*.csv
+!exports/sample-portfolio.csv
+cache/
+portfolio.db
+.DS_Store
+__pycache__
+*.py[oc]
+.playwright-mcp
+screenshots
+.claude
+docs
