@@ -8,11 +8,32 @@ A self-hosted portfolio dashboard for Trade Republic CSV exports. Tracks holding
 
 ## Screenshots
 
+### Overview — portfolio value, returns, rolling performance
 ![Overview](docs/screenshot-overview.png)
 
+### Analytics — monthly returns heatmap, Sharpe, drawdown
 ![Analytics](docs/screenshot-analytics.png)
 
+### Holdings — positions with avg cost, market value, unrealized P&L
 ![Holdings](docs/screenshot-holdings.png)
+
+### Cash flow — balance history and inflow/outflow waterfall
+![Cash flow](docs/screenshot-cashflow.png)
+
+### Income — dividends, interest, stock perks log
+![Income](docs/screenshot-income.png)
+
+### Realized P&L — closed trades with per-trade gain/loss
+![Realized P&L](docs/screenshot-realized.png)
+
+### Tax — Vorabpauschale, withholding, FSA tracker
+![Tax](docs/screenshot-tax.png)
+
+### Rebalance — target weights with buy/sell actions
+![Rebalance](docs/screenshot-rebalance.png)
+
+### Goals / FIRE — FIRE calculator and 10-year projection
+![Goals FIRE](docs/screenshot-goals.png)
 
 ---
 
