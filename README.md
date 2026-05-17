@@ -6,6 +6,16 @@ A self-hosted portfolio dashboard for Trade Republic CSV exports. Tracks holding
 
 ---
 
+## Screenshots
+
+![Overview](docs/screenshot-overview.png)
+
+![Analytics](docs/screenshot-analytics.png)
+
+![Holdings](docs/screenshot-holdings.png)
+
+---
+
 ## Tech stack
 
 | Layer | Tech |
