@@ -5,9 +5,13 @@ build/
 dist/
 wheels/
 *.egg-info
+node_modules/
 
 # Virtual environments
 .venv
 exports/**
+!exports/
+!exports/sample-portfolio.csv
 .playwright-mcp
 screenshots
+certs/

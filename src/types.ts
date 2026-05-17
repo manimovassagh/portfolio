@@ -1,0 +1,125 @@
+export type ExportName = string;
+
+export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax';
+export type ChartMode = 'Value' | 'TWR' | 'Drawdown';
+
+export type Summary = {
+  export: string;
+  portfolio_value: number;
+  market_value: number;
+  cash_balance: number;
+  cost_basis: number;
+  net_deposits: number;
+  deposits: number;
+  withdrawals: number;
+  unrealized_pnl: number;
+  unrealized_pct: number;
+  realized_pnl: number;
+  total_return: number;
+  xirr: number | null;
+  dividends: number;
+  interest: number;
+  stockperks: number;
+  fees: number;
+  tax: number;
+  n_holdings: number;
+  n_realized: number;
+  holder_name: string | null;
+  first_trade_date: string | null;
+};
+
+export type Holding = {
+  isin: string;
+  name: string;
+  asset_class: string;
+  shares: number;
+  avg_cost: number;
+  cost_basis: number;
+  current_price: number | null;
+  market_value: number | null;
+  unrealized_pnl: number | null;
+  unrealized_pct: number | null;
+  weight: number;
+  fees_paid: number;
+  ttm_dividend: number | null;
+  ttm_yield: number | null;
+};
+
+export type Performance = {
+  series: Array<{ date: string; portfolio_value: number | null; contributions: number | null; holdings_value: number | null }>;
+  drawdown: Array<{ date: string; drawdown: number }>;
+  twr: Array<{ date: string; twr: number }>;
+  benchmark: null | { name: string; series: Array<{ date: string; value: number | null }> };
+  best_worst: {
+    best: Array<{ date: string; pnl: number }>;
+    worst: Array<{ date: string; pnl: number }>;
+  };
+};
+
+export type CashFlow = {
+  balance: Array<{ date: string; cash: number }>;
+  buckets: Array<{ label: string; value: number }>;
+};
+
+export type Analytics = {
+  monthly: Record<string, Record<string, number | null>>;
+  annual: Array<{ year: number; pnl: number; pct: number }>;
+  sharpe: number | null;
+  volatility: number | null;
+  max_dd_days: number;
+  sectors: Array<{ label: string; value: number }>;
+  pnl_series: Array<{ date: string; pnl: number }>;
+};
+
+export type IncomeRow = Record<string, string | number | null>;
+export type TaxRow = Record<string, string | number | null>;
+
+export type RealizedRow = {
+  date: string | null;
+  name: string;
+  isin: string;
+  shares: number;
+  sell_price: number;
+  avg_cost: number;
+  pnl: number;
+  pnl_pct: number;
+};
+
+export type AssetDetail = {
+  isin: string;
+  name: string;
+  asset_class: string;
+  transactions: Array<{
+    date: string | null;
+    type: string;
+    shares: number | null;
+    price: number | null;
+    amount: number | null;
+    fee: number | null;
+    tax: number | null;
+    description: string;
+  }>;
+  current: {
+    shares: number;
+    avg_cost: number;
+    cost_basis: number;
+    current_price: number | null;
+    market_value: number | null;
+    unrealized: number | null;
+  };
+};
+
+export type DashboardData = {
+  exports: ExportName[];
+  summary: Summary;
+  holdings: Holding[];
+  totalMV: number;
+  perf: Performance;
+  cashFlow: CashFlow;
+  income: IncomeRow[];
+  incomeTotals: Record<string, number>;
+  realized: RealizedRow[];
+  realizedTotal: number;
+  tax: TaxRow[];
+  analytics: Analytics;
+};

@@ -1,13 +1,20 @@
-.PHONY: run dev install clean cache exports help
+.PHONY: run dev frontend typecheck install clean cache exports help
 
-run:
-	uv run uvicorn api:app --port 8765
+run: frontend
+	uv run uvicorn api:app --host 0.0.0.0 --port 8765
 
-dev:
-	uv run uvicorn api:app --reload --port 8765
+dev: frontend
+	uv run uvicorn api:app --host 0.0.0.0 --reload --port 8765
+
+frontend:
+	npm run build
+
+typecheck:
+	npm run typecheck
 
 install:
 	uv sync
+	npm install
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
@@ -26,7 +33,9 @@ help:
 	@echo ""
 	@echo "  run       Start server (production, port 8765)"
 	@echo "  dev       Start server with auto-reload (development)"
-	@echo "  install   Install dependencies via uv"
+	@echo "  frontend  Build React/Vite frontend"
+	@echo "  typecheck Type-check TypeScript frontend"
+	@echo "  install   Install backend and frontend dependencies"
 	@echo "  clean     Remove __pycache__ and .pyc files"
 	@echo "  cache     Clear yfinance price cache"
 	@echo "  exports   List CSV export files"

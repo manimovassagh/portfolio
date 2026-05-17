@@ -1,0 +1,69 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  body {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+@layer components {
+  .num {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0;
+  }
+
+  .pro-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+  }
+
+  .pro-table thead {
+    background: rgb(248 250 252);
+    color: rgb(100 116 139);
+  }
+
+  .dark .pro-table thead {
+    background: rgb(15 23 42 / 0.72);
+    color: rgb(148 163 184);
+  }
+
+  .pro-table th {
+    padding: 0.8rem 1rem;
+    text-align: left;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .pro-table td {
+    border-top: 1px solid rgb(226 232 240 / 0.75);
+    padding: 0.85rem 1rem;
+    vertical-align: middle;
+  }
+
+  .dark .pro-table td {
+    border-top-color: rgb(51 65 85 / 0.55);
+  }
+
+  .pro-table tbody tr {
+    transition: background-color 150ms ease;
+  }
+
+  .pro-table tbody tr:hover {
+    background: rgb(241 245 249 / 0.72);
+  }
+
+  .dark .pro-table tbody tr:hover {
+    background: rgb(30 41 59 / 0.62);
+  }
+}

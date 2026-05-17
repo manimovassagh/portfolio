@@ -1,31 +1,33 @@
-# 📈 Trade Republic Portfolio Dashboard
+# Kapital Portfolio Dashboard
 
-Local dashboard for Trade Republic CSV exports. Cost-basis math + live EUR prices from Yahoo Finance.
+Local FastAPI + React dashboard for portfolio CSV exports. The repo ships with a synthetic demo export in `exports/sample-portfolio.csv` for screenshots and videos.
 
 ## Run
 
 ```bash
-uv run streamlit run app.py
+npm install
+npm run build
+uv run uvicorn api:app --port 8765
 ```
 
-Opens at <http://localhost:8501>.
+Opens at <http://127.0.0.1:8765>.
 
 ## How to use
 
 1. Export transactions from the Trade Republic app: **Profile → Documents → Transaction history → Export**.
-2. Drop the CSV into `exports/`. Newest export is selected by default; old ones stay around so you can switch between them.
-3. Open the dashboard. Hit **🔄 Refresh prices** in the sidebar if you want fresh live quotes (otherwise cached for 15 min / 1 day on disk).
+2. Drop the CSV into `exports/`, or use the dashboard import control.
+3. Open the dashboard. The newest export is selected by default; old exports stay available in the file selector.
 
 ## Tabs
 
-- **Overview** — pie charts by position and asset class, headline numbers.
-- **Positions** — current holdings with shares, avg cost, market value, unrealized P&L.
-- **Performance** — portfolio value vs cumulative deposits over time.
+- **Overview** — headline numbers, rolling returns, performance chart, and movers.
+- **Analytics** — monthly returns, annual P&L, allocation, and unrealized P&L over time.
+- **Holdings** — current holdings with shares, avg cost, market value, unrealized P&L.
 - **Cash flow** — cash balance area chart + inflow/outflow waterfall.
 - **Income** — dividends, interest, stock perks log.
 - **Realized P&L** — closed trades with per-trade P&L.
 - **Tax** — Vorabpauschale, withholding tax, capital gains tax (German tax view).
-- **Deep dive** — per-asset transaction history.
+- **Asset modal** — per-asset transaction history.
 
 ## Adding a new asset
 
@@ -40,8 +42,12 @@ Currency handling: USD-denominated tickers are FX-converted to EUR automatically
 
 ```
 portfolio/
-├── app.py                    # Streamlit entry point
+├── api.py                    # FastAPI backend
+├── src/                      # React + TypeScript frontend
+├── templates/index.html      # React mount page
+├── static/dist/              # Built frontend assets
 ├── pyproject.toml
+├── package.json
 ├── portfolio/
 │   ├── loader.py             # CSV → DataFrame
 │   ├── positions.py          # Holdings & realized P&L (avg-cost basis)

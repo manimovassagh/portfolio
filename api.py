@@ -1,10 +1,10 @@
 # pyright: reportGeneralTypeIssues=false
-"""FastAPI backend.
+"""FastAPI backend for the portfolio dashboard.
 
-JSON endpoints reuse the existing `portfolio/` data layer. The frontend is a
-single Jinja2-rendered page powered by Tailwind + Alpine.js + ApexCharts.
+JSON endpoints reuse the `portfolio/` data layer. The browser app is a bundled
+React/Vite frontend served from `static/dist`.
 
-Run with:  uv run uvicorn api:app --reload --port 8000
+Run with:  uv run uvicorn api:app --reload --port 8765
 """
 from __future__ import annotations
 
