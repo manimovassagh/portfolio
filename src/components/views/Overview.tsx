@@ -1,18 +1,21 @@
 import { useMemo, useState } from 'react';
+import Chart from 'react-apexcharts';
+import type { ApexOptions } from 'apexcharts';
 import {
-  Activity, ArrowDownRight, ArrowUpRight,
-  Banknote, CheckCircle2, PiggyBank, Receipt, Wallet,
+  ArrowUpRight, ChevronRight, EyeOff, LockKeyhole,
+  MoreHorizontal, Plus, Settings, Share2,
 } from 'lucide-react';
 import { Card } from '../ui/Card';
-import { MetricCard } from '../ui/MetricCard';
 import { InfoModal } from '../ui/InfoModal';
-import { PanelTitle } from '../ui/PanelTitle';
 import { HeroChart } from '../charts/HeroChart';
-import { AllocationTreemap } from '../charts/AllocationTreemap';
+import { chartTheme, tileColor } from '../../lib/chart';
 import { fmtEUR, signedEUR, pct, rollingReturns } from '../../lib/format';
-import type { ChartMode, DashboardData, Holding, SectionId } from '../../types';
+import type { ChartMode, DashboardData, Holding, PositionRange, SectionId } from '../../types';
 
 type DetailView = 'unrealized' | 'income' | 'fees' | null;
+type AllocationTab = 'type' | 'positions' | 'regions' | 'sectors';
+type ChartRange = '1D' | '1W' | '1M' | 'YTD' | '1Y' | 'Max';
+type PositionRangeOption = PositionRange | 'Max';
 
 interface OverviewProps {
   data: DashboardData;
@@ -23,21 +26,195 @@ interface OverviewProps {
   navigate: (id: SectionId) => void;
 }
 
-export function Overview({ data, dark, chartMode, setChartMode, openAsset, navigate }: OverviewProps) {
+export function Overview({ data, dark, chartMode, openAsset, navigate }: OverviewProps) {
   const s = data.summary;
+  const t = chartTheme(true);
   const returns = useMemo(() => rollingReturns(data.perf.twr), [data.perf.twr]);
-  const movers = useMemo(
-    () => [...data.holdings].filter((h) => h.unrealized_pnl !== null).sort((a, b) => Math.abs(b.unrealized_pnl || 0) - Math.abs(a.unrealized_pnl || 0)).slice(0, 6),
+  const sortedHoldings = useMemo(
+    () => [...data.holdings].filter((h) => h.market_value !== null).sort((a, b) => (b.market_value || 0) - (a.market_value || 0)),
     [data.holdings],
   );
+  const topHoldings = useMemo(() => sortedHoldings.slice(0, 6), [sortedHoldings]);
   const unrealizedHoldings = useMemo(
     () => [...data.holdings].filter((h) => h.unrealized_pnl !== null).sort((a, b) => (b.unrealized_pnl || 0) - (a.unrealized_pnl || 0)),
     [data.holdings],
   );
   const [detail, setDetail] = useState<DetailView>(null);
+  const [allocationTab, setAllocationTab] = useState<AllocationTab>('type');
+  const [chartRange, setChartRange] = useState<ChartRange>('Max');
+  const [positionRange, setPositionRange] = useState<PositionRangeOption>('Max');
+  const totalPnl = s.portfolio_value - s.net_deposits;
+  const totalPnlPct = s.net_deposits ? (totalPnl / s.net_deposits) * 100 : 0;
+  const allocationHoldings = useMemo(
+    () => [...data.holdings]
+      .filter((holding) => (holding.market_value || 0) > 0)
+      .sort((a, b) => (b.market_value || 0) - (a.market_value || 0)),
+    [data.holdings],
+  );
+  const allocation = useMemo(() => {
+    const withCash = (rows: Array<{ label: string; value: number }>) => {
+      const filtered = rows.filter((item) => item.value > 0);
+      if (s.cash_balance > 0) filtered.push({ label: 'Cash', value: s.cash_balance });
+      return filtered.sort((a, b) => b.value - a.value);
+    };
+
+    if (allocationTab === 'positions') {
+      return withCash(allocationHoldings.map((holding) => ({
+        label: holding.name,
+        value: holding.market_value || 0,
+      })));
+    }
+
+    if (allocationTab === 'regions') {
+      const names: Record<string, string> = {
+        DE: 'Germany',
+        US: 'United States',
+        IE: 'Ireland',
+        LU: 'Luxembourg',
+        FR: 'France',
+        GB: 'United Kingdom',
+        NL: 'Netherlands',
+        BTC: 'Crypto',
+        ETH: 'Crypto',
+      };
+      const grouped = new Map<string, number>();
+      allocationHoldings.forEach((holding) => {
+        const code = holding.isin.length >= 2 ? holding.isin.slice(0, 2).toUpperCase() : 'Other';
+        const label = names[code] || code;
+        grouped.set(label, (grouped.get(label) || 0) + (holding.market_value || 0));
+      });
+      return withCash([...grouped.entries()].map(([label, value]) => ({ label, value })));
+    }
+
+    const grouped = new Map<string, number>();
+    allocationHoldings.forEach((holding) => {
+      const label = holding.asset_class || 'Other';
+      grouped.set(label, (grouped.get(label) || 0) + (holding.market_value || 0));
+    });
+    return withCash([...grouped.entries()].map(([label, value]) => ({ label, value })));
+  }, [allocationHoldings, allocationTab, s.cash_balance]);
+  const allocationTotal = s.portfolio_value;
+  const rangeOptions: ChartRange[] = ['1D', '1W', '1M', 'YTD', '1Y', 'Max'];
+  const allocationColors = ['#3347c4', '#4974c7', '#5eb1dd', '#82d3e1', '#8ee4d8', '#62d995', '#f2ad3a'];
+  const positionRangeOptions: PositionRangeOption[] = ['1D', '1W', '1M', 'YTD', '1Y', 'Max'];
+  const positionRows = useMemo(() => {
+    const rows = sortedHoldings.map((holding) => {
+      if (positionRange === 'Max') {
+        return {
+          holding,
+          pnl: holding.unrealized_pnl,
+          pct: holding.unrealized_pct,
+        };
+      }
+      const range = data.positionReturns[holding.isin]?.[positionRange];
+      return {
+        holding,
+        pnl: range?.pnl ?? null,
+        pct: range?.pct ?? null,
+      };
+    });
+    return [...rows].sort((a, b) => Math.abs(b.pnl ?? 0) - Math.abs(a.pnl ?? 0));
+  }, [data.positionReturns, positionRange, sortedHoldings]);
+  const chartData = useMemo(() => {
+    if (chartRange === 'Max') return data;
+
+    const allDates = [
+      ...data.perf.series.map((point) => point.date),
+      ...data.perf.twr.map((point) => point.date),
+      ...data.perf.drawdown.map((point) => point.date),
+    ].filter(Boolean).sort();
+    const lastDate = allDates.at(-1);
+    if (!lastDate) return data;
+
+    const end = new Date(`${lastDate}T00:00:00`);
+    const start = new Date(end);
+    if (chartRange === '1D') start.setDate(end.getDate() - 1);
+    if (chartRange === '1W') start.setDate(end.getDate() - 7);
+    if (chartRange === '1M') start.setMonth(end.getMonth() - 1);
+    if (chartRange === '1Y') start.setFullYear(end.getFullYear() - 1);
+    if (chartRange === 'YTD') {
+      start.setMonth(0);
+      start.setDate(1);
+    }
+
+    const startKey = start.toISOString().slice(0, 10);
+    const keepWindow = <T extends { date: string }>(rows: T[]) => {
+      const filtered = rows.filter((row) => row.date >= startKey);
+      return filtered.length >= 2 ? filtered : rows.slice(-2);
+    };
+
+    return {
+      ...data,
+      perf: {
+        ...data.perf,
+        series: keepWindow(data.perf.series),
+        twr: keepWindow(data.perf.twr),
+        drawdown: keepWindow(data.perf.drawdown),
+        benchmark: data.perf.benchmark
+          ? { ...data.perf.benchmark, series: keepWindow(data.perf.benchmark.series) }
+          : null,
+      },
+    };
+  }, [chartRange, data]);
+  const allocationTreemapSeries = useMemo(() => [{
+    data: allocationHoldings.map((holding) => ({
+      x: holding.name,
+      y: holding.market_value || 0,
+      fillColor: tileColor(holding.unrealized_pct ?? 0),
+    })),
+  }], [allocationHoldings]);
+  const allocationTreemapOptions = useMemo<ApexOptions>(() => ({
+    ...t,
+    chart: {
+      ...t.chart,
+      type: 'treemap',
+      events: {
+        dataPointSelection: (_event, _chart, config) => {
+          const holding = allocationHoldings[config.dataPointIndex];
+          if (holding) openAsset(holding);
+        },
+      },
+    },
+    plotOptions: {
+      treemap: {
+        distributed: true,
+        enableShades: false,
+      },
+    },
+    dataLabels: {
+      enabled: true,
+      style: {
+        colors: ['#ffffff'],
+        fontFamily: 'Inter, ui-sans-serif, system-ui, sans-serif',
+        fontSize: '12px',
+        fontWeight: 800,
+      },
+      formatter: (label: string, opts) => {
+        const holding = allocationHoldings[opts.dataPointIndex];
+        if (!holding) return label;
+        return `${label}\n${holding.weight.toFixed(1)}%`;
+      },
+    },
+    stroke: { width: 2, colors: ['#202020'] },
+    legend: { show: false },
+    tooltip: {
+      ...t.tooltip,
+      custom: ({ dataPointIndex }) => {
+        const holding = allocationHoldings[dataPointIndex];
+        if (!holding) return '';
+        const color = tileColor(holding.unrealized_pct ?? 0);
+        return `<div style="padding:10px 12px;font-size:12px;font-family:Inter,sans-serif">
+          <div style="max-width:240px;font-weight:800;margin-bottom:6px">${holding.name}</div>
+          <div>Market value: <b>${fmtEUR(holding.market_value)}</b></div>
+          <div>Weight: <b>${holding.weight.toFixed(1)}%</b></div>
+          <div>P/L: <b style="color:${color}">${signedEUR(holding.unrealized_pnl)} (${pct(holding.unrealized_pct)})</b></div>
+        </div>`;
+      },
+    },
+  }), [allocationHoldings, openAsset, t]);
 
   return (
-    <section className="space-y-6">
+    <section className="space-y-7">
       {detail === 'unrealized' && (
         <InfoModal title="Unrealized P&L by holding" onClose={() => setDetail(null)}>
           <div className="max-h-80 space-y-2 overflow-y-auto pr-1">
@@ -78,11 +255,11 @@ export function Overview({ data, dark, chartMode, setChartMode, openAsset, navig
       )}
 
       {detail === 'fees' && (
-        <InfoModal title="Fees & tax breakdown" onClose={() => setDetail(null)}>
+        <InfoModal title="Cash costs breakdown" onClose={() => setDetail(null)}>
           <div className="space-y-3">
             {[
               { label: 'Trading fees', value: s.fees,           color: 'text-rose-500' },
-              { label: 'Tax paid',     value: s.tax,            color: 'text-rose-500' },
+              { label: 'Tax withheld', value: s.tax,            color: 'text-slate-700 dark:text-slate-200' },
               { label: 'Total drag',   value: s.fees + s.tax,   color: 'text-rose-600' },
             ].map((row) => (
               <div key={row.label} className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3 dark:bg-slate-800">
@@ -97,99 +274,254 @@ export function Overview({ data, dark, chartMode, setChartMode, openAsset, navig
         </InfoModal>
       )}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <div className="md:col-span-2">
-          <MetricCard label="Portfolio value" value={fmtEUR(s.portfolio_value)} detail={`${signedEUR(s.portfolio_value - s.net_deposits)} vs deposits · since ${s.first_trade_date ?? '—'}`} tone={s.portfolio_value >= s.net_deposits ? 'gain' : 'loss'} icon={Wallet} onClick={() => navigate('analytics')} />
-        </div>
-        <MetricCard label="Unrealized P&L"  value={signedEUR(s.unrealized_pnl)} detail={pct(s.unrealized_pct)} tone={s.unrealized_pnl >= 0 ? 'gain' : 'loss'} icon={ArrowUpRight} onClick={() => setDetail('unrealized')} />
-        <MetricCard label="Realized P&L"    value={signedEUR(s.realized_pnl)} detail={`${s.n_realized} closed trades`} tone={s.realized_pnl >= 0 ? 'gain' : 'loss'} icon={CheckCircle2} onClick={() => navigate('realized')} />
-        <MetricCard label="XIRR annualized" value={s.xirr === null ? '—' : pct(s.xirr * 100)} detail="Money-weighted return" tone={(s.xirr || 0) >= 0 ? 'gain' : 'loss'} icon={Activity} onClick={() => navigate('analytics')} />
-        <MetricCard label="Net deposits"    value={fmtEUR(s.net_deposits)} detail={`${s.n_holdings} open positions`} icon={PiggyBank} onClick={() => navigate('cash')} />
-        <MetricCard label="Total income"    value={fmtEUR(s.dividends + s.interest + s.stockperks)} detail="Dividends · interest · perks" tone="gain" icon={Banknote} onClick={() => setDetail('income')} />
-        <MetricCard label="Fees & tax"      value={fmtEUR(-(s.fees + s.tax))} detail={`${fmtEUR(s.fees)} fees · ${fmtEUR(s.tax)} tax`} tone="loss" icon={Receipt} onClick={() => setDetail('fees')} />
-      </div>
+      <div className="grid gap-7 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+        <Card className="overflow-hidden rounded-lg !border-[#303030] !bg-[#202020] text-white shadow-none">
+          <div className="flex items-center justify-between border-b border-white/6 px-5 py-4">
+            <div>
+              <h2 className="text-lg font-black">Portfolio</h2>
+              <div className="mt-4 inline-flex border-b border-white pb-2 text-sm font-black">Trade Republic</div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-black text-black hover:bg-slate-100" onClick={() => navigate('holdings')}>
+                <Plus size={16} /> Add account
+              </button>
+              <button className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white"><Settings size={18} /></button>
+              <button className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white"><Share2 size={18} /></button>
+            </div>
+          </div>
 
-      <div className="grid gap-3 sm:grid-cols-5 xl:grid-cols-7">
-        {returns.map((item) => (
-          <Card key={item.label} className="border-l-4 border-l-slate-300 p-4 dark:border-l-slate-700">
-            <div className="flex items-center justify-between">
-              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">{item.label}</div>
-              {(item.pct ?? 0) >= 0 ? <ArrowUpRight size={16} className="text-emerald-500" /> : <ArrowDownRight size={16} className="text-rose-500" />}
+          <div className="px-5 py-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-bold text-slate-300">
+              <div className="flex items-center gap-5">
+                <button className="inline-flex items-center gap-2 hover:text-white"><EyeOff size={17} /> Hide</button>
+                <button className="inline-flex items-center gap-2 hover:text-white" onClick={() => navigate('analytics')}><ArrowUpRight size={17} /> Performance</button>
+              </div>
+              <button className="inline-flex items-center gap-2 text-slate-300 hover:text-white"><LockKeyhole size={18} /> Add benchmark</button>
             </div>
-            <div className={`num mt-4 text-xl font-black tracking-normal ${(item.pct ?? 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
-              {item.pct === null ? '—' : pct(item.pct)}
-            </div>
-          </Card>
-        ))}
-        {data.perf.best_worst.best[0] && (
-          <Card className="border-l-4 border-l-emerald-500 p-4">
-            <div className="flex items-center justify-between">
-              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">Best days</div>
-              <ArrowUpRight size={16} className="text-emerald-500" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {data.perf.best_worst.best.map((d, i) => (
-                <div key={d.date} className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">{d.date}</span>
-                  <span className={`num text-sm font-black ${i === 0 ? 'text-emerald-500' : 'text-emerald-400'}`}>{signedEUR(d.pnl)}</span>
+
+            <div className="mt-7 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
+              <button className="text-left" onClick={() => navigate('analytics')}>
+                <div className="flex items-center gap-3">
+                  <span className={`h-2 w-2 rounded-full ${totalPnl >= 0 ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                  <div className="num text-5xl font-black tracking-normal text-white">{fmtEUR(s.portfolio_value)}</div>
                 </div>
-              ))}
-            </div>
-          </Card>
-        )}
-        {data.perf.best_worst.worst[0] && (
-          <Card className="border-l-4 border-l-rose-500 p-4">
-            <div className="flex items-center justify-between">
-              <div className="num text-base font-black tracking-normal text-slate-700 dark:text-slate-200">Worst days</div>
-              <ArrowDownRight size={16} className="text-rose-500" />
-            </div>
-            <div className="mt-3 space-y-2">
-              {data.perf.best_worst.worst.map((d, i) => (
-                <div key={d.date} className="flex items-center justify-between">
-                  <span className="text-xs text-slate-500">{d.date}</span>
-                  <span className={`num text-sm font-black ${i === 0 ? 'text-rose-500' : 'text-rose-400'}`}>{signedEUR(d.pnl)}</span>
+                <div className={`num mt-3 text-xl font-black ${totalPnl >= 0 ? 'text-[#6ee787]' : 'text-rose-400'}`}>
+                  {pct(totalPnlPct)} <span className="text-base">({signedEUR(totalPnl)})</span>
                 </div>
-              ))}
+              </button>
+
+              <div className="min-w-0">
+                <div className="mb-3 flex justify-end gap-3">
+                  {rangeOptions.map((range) => (
+                    <button
+                      key={range}
+                      onClick={() => setChartRange(range)}
+                      className={`rounded-md px-4 py-2 text-sm font-black ${range === chartRange ? 'bg-white/10 text-white' : 'text-slate-500 hover:text-white'}`}
+                    >
+                      {range}
+                    </button>
+                  ))}
+                </div>
+                <HeroChart data={chartData} dark={true} mode={chartMode} height={300} showLegend={false} minimal />
+              </div>
             </div>
-          </Card>
-        )}
-      </div>
+          </div>
+        </Card>
 
-      <AllocationTreemap data={data} dark={dark} openAsset={openAsset} />
-
-      <div className="grid gap-5 xl:grid-cols-3">
-        <Card className="p-5 xl:col-span-2">
-          <PanelTitle title="Portfolio performance" subtitle="Portfolio value, deposits, and benchmark" />
-          <div className="mb-3 flex gap-1 rounded-lg bg-slate-100 p-1 dark:bg-slate-800">
-            {(['Value', 'TWR', 'Drawdown'] as ChartMode[]).map((mode) => (
+        <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+          <div className="flex items-center justify-between">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-lg font-black">Allocation</h2>
+              <span className="text-sm font-black uppercase text-slate-500">Live</span>
+            </div>
+            <button onClick={() => navigate('analytics')} className="inline-flex items-center gap-1 text-sm font-bold text-slate-300 hover:text-white">
+              Show more <ChevronRight size={16} />
+            </button>
+          </div>
+          <div className="mt-5 flex gap-5 overflow-x-auto border-b border-white/8 text-sm font-bold text-slate-500">
+            {[
+              { id: 'type', label: 'Type' },
+              { id: 'positions', label: 'Positions' },
+              { id: 'regions', label: 'Regions' },
+              { id: 'sectors', label: 'Sectors' },
+            ].map((item) => (
               <button
-                key={mode}
-                onClick={() => setChartMode(mode)}
-                className={`rounded-md px-3 py-1.5 text-sm font-bold ${chartMode === mode ? 'bg-white text-slate-950 shadow-sm dark:bg-slate-950 dark:text-white' : 'text-slate-500'}`}
+                key={item.id}
+                onClick={() => setAllocationTab(item.id as AllocationTab)}
+                className={`pb-3 ${allocationTab === item.id ? 'border-b-2 border-white text-white' : 'hover:text-white'}`}
               >
-                {mode}
+                {item.label}
               </button>
             ))}
           </div>
-          <HeroChart data={data} dark={dark} mode={chartMode} />
-        </Card>
-        <Card className="p-5">
-          <PanelTitle title="Movers" subtitle="Largest unrealized P&L" />
+          <Chart
+            type="donut"
+            height={330}
+            series={allocation.map((item) => item.value)}
+            options={{
+              ...t,
+              labels: allocation.map((item) => item.label),
+              colors: allocationColors,
+              stroke: { width: 0 },
+              plotOptions: { pie: { donut: { size: '70%', labels: { show: true, name: { color: '#8b8b8b', fontSize: '13px' }, value: { color: '#fff', fontSize: '26px', formatter: (v: string) => fmtEUR(Number(v)) }, total: { show: true, label: 'Allocation', color: '#8b8b8b', formatter: () => fmtEUR(allocationTotal) } } } } },
+              dataLabels: { enabled: false },
+              legend: { show: false },
+              tooltip: { ...t.tooltip, y: { formatter: (v) => fmtEUR(v) } },
+            }}
+          />
           <div className="mt-2 space-y-2">
-            {movers.map((item) => (
-              <button key={item.isin} onClick={() => openAsset(item)} className="flex w-full items-center justify-between gap-3 rounded-lg p-2 text-left hover:bg-slate-50 dark:hover:bg-slate-800">
+            {allocation.map((item, index) => {
+              const weight = allocationTotal ? (item.value / allocationTotal) * 100 : 0;
+              return (
+                <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg bg-white/[0.04] px-3 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: allocationColors[index % allocationColors.length] }} />
+                    <span className="truncate text-sm font-black text-slate-200">{item.label}</span>
+                  </div>
+                  <div className="num shrink-0 text-right text-sm font-black text-white">
+                    {weight.toFixed(1)}%
+                    <span className="ml-2 text-slate-500">{fmtEUR(item.value)}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Card>
+      </div>
+
+      <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black">Position wall</h2>
+            <div className="mt-1 text-sm font-bold text-slate-500">Size = value · color = P/L</div>
+          </div>
+          <div className="flex items-center gap-3 text-xs font-black uppercase text-slate-500">
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-sm bg-rose-500" />
+              Loss
+            </span>
+            <span className="inline-flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-sm bg-emerald-500" />
+              Gain
+            </span>
+          </div>
+        </div>
+        <div className="mt-5 min-w-0 rounded-lg bg-white/[0.035] p-3">
+          <Chart
+            type="treemap"
+            height={360}
+            series={allocationTreemapSeries}
+            options={allocationTreemapOptions}
+          />
+        </div>
+      </Card>
+
+      <div className="grid gap-7 xl:grid-cols-[minmax(0,2fr)_minmax(360px,1fr)]">
+        <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <h2 className="text-lg font-black">Positions</h2>
+            <button onClick={() => navigate('holdings')} className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-black text-black hover:bg-slate-100"><Plus size={16} /> Add transaction</button>
+          </div>
+          <div className="mt-6 flex gap-8 text-sm font-black text-slate-500">
+            {positionRangeOptions.map((range) => (
+              <button
+                key={range}
+                onClick={() => setPositionRange(range)}
+                className={range === positionRange ? 'rounded-md bg-white/10 px-4 py-2 text-white' : 'py-2 hover:text-white'}
+              >
+                {range}
+              </button>
+            ))}
+          </div>
+          <div className="mt-5 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="text-left text-xs font-black uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="py-3">Title</th>
+                  <th className="py-3 text-right">Buy in</th>
+                  <th className="py-3 text-right">Position</th>
+                  <th className="py-3 text-right">P/L</th>
+                  <th className="w-8 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {positionRows.map(({ holding: item, pnl, pct: rangePct }) => (
+                  <tr key={item.isin} className="border-t border-white/6 transition hover:bg-white/[0.04]">
+                    <td className="py-4">
+                      <button onClick={() => openAsset(item)} className="flex items-center gap-3 text-left">
+                        <span className="flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-sm font-black text-slate-300">{item.name.slice(0, 1)}</span>
+                        <span>
+                          <span className="block font-black text-white">{item.name}</span>
+                          <span className="num text-xs text-slate-500">{item.isin}</span>
+                        </span>
+                      </button>
+                    </td>
+                    <td className="num py-4 text-right">
+                      <div className="font-bold text-slate-200">{fmtEUR(item.cost_basis)}</div>
+                      <div className="text-xs text-slate-500">{fmtEUR(item.avg_cost)}</div>
+                    </td>
+                    <td className="num py-4 text-right">
+                      <div className="font-bold text-slate-200">{fmtEUR(item.market_value)}</div>
+                      <div className="text-xs text-slate-500">{item.shares.toFixed(4)} shares</div>
+                    </td>
+                    <td className={`num py-4 text-right font-black ${(pnl || 0) >= 0 ? 'text-[#6ee787]' : 'text-rose-400'}`}>
+                      <div>{signedEUR(pnl)}</div>
+                      <div className="text-xs">{pct(rangePct)}</div>
+                    </td>
+                    <td className="py-4 text-right text-slate-500"><MoreHorizontal size={18} /></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+
+        <div className="space-y-7">
+          <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+            <h2 className="text-lg font-black">Quick stats</h2>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              {[
+                { label: 'Unrealized', value: signedEUR(s.unrealized_pnl), action: () => setDetail('unrealized'), positive: s.unrealized_pnl >= 0 },
+                { label: 'Realized', value: signedEUR(s.realized_pnl), action: () => navigate('realized'), positive: s.realized_pnl >= 0 },
+                { label: 'Income', value: fmtEUR(s.dividends + s.interest + s.stockperks), action: () => setDetail('income'), positive: true },
+                { label: 'Costs', value: fmtEUR(-(s.fees + s.tax)), action: () => setDetail('fees'), positive: false },
+              ].map((item) => (
+                <button key={item.label} onClick={item.action} className="rounded-lg bg-white/[0.04] p-3 text-left hover:bg-white/[0.07]">
+                  <div className="text-xs font-black uppercase tracking-wide text-slate-500">{item.label}</div>
+                  <div className={`num mt-2 text-base font-black ${item.positive ? 'text-[#6ee787]' : 'text-rose-400'}`}>{item.value}</div>
+                </button>
+              ))}
+            </div>
+          </Card>
+          <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+            <h2 className="text-lg font-black">Performance windows</h2>
+            <div className="mt-3 space-y-2">
+              {returns.map((item) => (
+                <div key={item.label} className="flex items-center justify-between rounded-lg bg-white/[0.04] px-3 py-2">
+                  <span className="num text-sm font-black text-slate-300">{item.label}</span>
+                  <span className={`num text-sm font-black ${(item.pct ?? 0) >= 0 ? 'text-[#6ee787]' : 'text-rose-400'}`}>{item.pct === null ? '—' : pct(item.pct)}</span>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+            <h2 className="text-lg font-black">Largest movers</h2>
+            <div className="mt-2 space-y-2">
+              {topHoldings.slice(0, 4).map((item) => (
+              <button key={item.isin} onClick={() => openAsset(item)} className="flex w-full items-center justify-between gap-3 rounded-lg p-2 text-left hover:bg-white/[0.06]">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-bold">{item.name}</div>
-                  <div className="num text-xs text-slate-500">{item.isin}</div>
+                  <div className="truncate text-sm font-bold text-slate-100">{item.name}</div>
+                  <div className="num text-xs text-slate-500">{item.weight.toFixed(1)}% weight</div>
                 </div>
                 <div className="text-right">
-                  <div className={`num text-sm font-black ${(item.unrealized_pnl || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{signedEUR(item.unrealized_pnl)}</div>
+                  <div className={`num text-sm font-black ${(item.unrealized_pnl || 0) >= 0 ? 'text-[#6ee787]' : 'text-rose-400'}`}>{signedEUR(item.unrealized_pnl)}</div>
                   <div className="num text-xs text-slate-500">{pct(item.unrealized_pct)}</div>
                 </div>
               </button>
-            ))}
-          </div>
-        </Card>
+              ))}
+            </div>
+          </Card>
+        </div>
       </div>
     </section>
   );

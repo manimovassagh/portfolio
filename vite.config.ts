@@ -12,12 +12,9 @@ export default defineConfig({
     rollupOptions: {
       input: 'index.html',
       output: {
-        entryFileNames: 'app.js',
-        chunkFileNames: 'chunks/[name]-[hash].js',
-        assetFileNames: (assetInfo) => {
-          if (assetInfo.name?.endsWith('.css')) return 'app.css';
-          return 'assets/[name]-[hash][extname]';
-        },
+        entryFileNames: 'assets/[name]-[hash].js',
+        chunkFileNames: 'assets/[name]-[hash].js',
+        assetFileNames: 'assets/[name]-[hash][extname]',
         manualChunks: {
           react: ['react', 'react-dom'],
           charts: ['apexcharts', 'react-apexcharts'],

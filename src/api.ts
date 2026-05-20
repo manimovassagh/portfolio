@@ -10,6 +10,7 @@ import type {
   Holding,
   IncomeRow,
   Performance,
+  PositionReturns,
   RealizedRow,
   Summary,
   TaxRow,
@@ -30,11 +31,14 @@ export async function listExports(): Promise<ExportName[]> {
 
 export async function loadDashboard(exportName: ExportName): Promise<DashboardData> {
   const q = `?export=${encodeURIComponent(exportName)}`;
-  const [exports, summary, holdingsPayload, perf, cashFlow, incomePayload, realizedPayload, taxPayload, analytics] =
+  const [exports, summary] = await Promise.all([
+    listExports(),
+    getJson<Summary>(`/api/summary${q}`),
+  ]);
+  const [holdingsPayload, positionReturnsPayload, perf, cashFlow, incomePayload, realizedPayload, taxPayload, analytics] =
     await Promise.all([
-      listExports(),
-      getJson<Summary>(`/api/summary${q}`),
       getJson<{ holdings: Holding[]; total_market_value: number }>(`/api/holdings${q}`),
+      getJson<{ returns: PositionReturns }>(`/api/position_returns${q}`),
       getJson<Performance>(`/api/performance${q}`),
       getJson<CashFlow>(`/api/cash_flow${q}`),
       getJson<{ log: IncomeRow[]; totals: Record<string, number> }>(`/api/income${q}`),
@@ -47,6 +51,7 @@ export async function loadDashboard(exportName: ExportName): Promise<DashboardDa
     exports,
     summary,
     holdings: holdingsPayload.holdings,
+    positionReturns: positionReturnsPayload.returns,
     totalMV: holdingsPayload.total_market_value,
     perf,
     cashFlow,
