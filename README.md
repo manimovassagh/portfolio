@@ -1,130 +1,164 @@
 # Kapital
 
-A self-hosted portfolio dashboard for Trade Republic CSV exports. It parses exported transactions, refreshes market prices, and shows portfolio value, allocation, positions, income, realized P&L, tax allowance usage, watchlist items, rebalancing, and long-term goals.
+> Self-hosted portfolio analytics for Trade Republic — live prices, allocation, performance, tax, and FIRE projections in one dark-mode dashboard.
 
-The repo includes `exports/sample-portfolio.csv`, so the app can run without private account data.
+The repo ships with `exports/sample-portfolio.csv` so you can run the app immediately without any private data.
+
+---
 
 ## Screenshots
 
-| Overview | Analytics |
-|---|---|
-| ![Overview](docs/screenshot-overview.png) | ![Analytics](docs/screenshot-analytics.png) |
+![Overview](docs/screenshot-overview.png)
 
-| Holdings | Tax |
+| Analytics | Holdings |
 |---|---|
-| ![Holdings](docs/screenshot-holdings.png) | ![Tax](docs/screenshot-tax.png) |
+| ![Analytics](docs/screenshot-analytics.png) | ![Holdings](docs/screenshot-holdings.png) |
 
-| Income | Realized P&L |
+| Tax & FSA tracker | Rebalance |
 |---|---|
-| ![Income](docs/screenshot-income.png) | ![Realized P&L](docs/screenshot-realized.png) |
+| ![Tax](docs/screenshot-tax.png) | ![Rebalance](docs/screenshot-rebalance.png) |
 
-| Cash flow | Rebalance |
+| Income | Goals / FIRE |
 |---|---|
-| ![Cash flow](docs/screenshot-cashflow.png) | ![Rebalance](docs/screenshot-rebalance.png) |
+| ![Income](docs/screenshot-income.png) | ![Goals](docs/screenshot-goals.png) |
 
-## Tech Stack
+| Cash flow | Realized P&L |
+|---|---|
+| ![Cash flow](docs/screenshot-cashflow.png) | ![Realized P&L](docs/screenshot-realized.png) |
+
+---
+
+## What it does
+
+Kapital parses your Trade Republic CSV export and gives you a live portfolio view with:
+
+- **Live prices** via yfinance — refreshed on demand or every 60 s in the background
+- **Market status badge** — shows whether EU / US markets are open or closed
+- **Performance chart** with 1D / 1W / 1M / YTD / 1Y / Max range selector
+- **Allocation** — donut + treemap position wall, switchable by type / positions / regions / sectors
+- **Positions table** with per-range P&L (1D through Max)
+- **Analytics** — Sharpe ratio, max drawdown, monthly returns heatmap, geographic exposure, TWR, XIRR
+- **Tax** — Freistellungsauftrag (FSA) allowance tracker with breakdown by dividends, interest, stock perks, and realized gains
+- **Income** — dividend and interest log with TTM yield per holding
+- **Realized P&L** — closed-trade history with per-trade gain/loss
+- **Rebalance** — enter target weights, see suggested buy/sell amounts
+- **Goals / FIRE** — FIRE number calculator and 10-year growth projection
+- **Watchlist** — persisted asset watchlist with target prices (SQLite)
+
+---
+
+## Tech stack
 
 | Layer | Tech |
 |---|---|
 | Backend | Python 3.12, FastAPI, pandas, yfinance |
-| Frontend | React 19, TypeScript, Vite, Tailwind CSS, ApexCharts |
-| Persistence | CSV exports plus SQLite for the watchlist |
-| Tooling | uv, npm, Docker Compose |
+| Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, ApexCharts |
+| Persistence | CSV exports + SQLite watchlist |
+| Serving | uvicorn (local) · Nginx + Docker Compose (production) |
+| Tooling | uv, npm, mkcert / openssl |
 
-## Run Locally
+---
 
-Prerequisites: Python 3.12+, Node 20+, and `uv`.
+## Run locally
+
+**Prerequisites:** Python 3.12+, Node 20+, [`uv`](https://github.com/astral-sh/uv)
 
 ```bash
 npm install
 uv sync
-make run
+make run          # builds frontend, generates TLS cert, starts FastAPI
 ```
 
-Open `https://127.0.0.1:8765/overview`.
+Open **`https://127.0.0.1:8765`** — the browser will warn about the self-signed cert on first run.
 
-`make run` builds the frontend and starts FastAPI with the local TLS certificate in `certs/`. The direct command is:
+### Useful make targets
 
 ```bash
-uv run uvicorn api:app --host 0.0.0.0 --port 8765 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
+make dev          # same as run but with backend auto-reload
+make stop         # kill whatever is listening on PORT (default 8765)
+make frontend     # rebuild the Vite bundle only
+make typecheck    # run tsc --noEmit
+make cache        # wipe the yfinance price cache
+make exports      # list CSV files in exports/
 ```
 
-Useful targets:
+Override defaults:
 
 ```bash
-make dev          # rebuild and run with backend reload
-make typecheck    # TypeScript check
-make frontend     # frontend build only
-make cache        # clear live-price cache
-make stop         # stop the process using PORT
+PORT=9000 make run
+PRICE_REFRESH_SECONDS=120 make run
 ```
 
-## Run With Docker
+---
+
+## Run with Docker
 
 ```bash
 docker compose up --build
 ```
 
-| URL | Behavior |
+| URL | |
 |---|---|
 | `http://localhost` | Redirects to HTTPS |
-| `https://localhost` | Serves the app through Nginx |
+| `https://localhost` | Serves the app via Nginx |
 
-Volumes:
+**Volumes:**
 
 | Mount | Purpose |
 |---|---|
-| `./exports` | Local CSV exports |
-| `kapital-db` | SQLite watchlist database |
+| `./exports` | Your CSV exports (mounted read-write) |
+| `kapital-db` | Named volume for the SQLite watchlist |
 
-## Import Data
+---
 
-1. In Trade Republic, export the transaction history CSV.
-2. Put the CSV in `exports/`, or use the app header's **Import** control.
-3. Select the export from the header dropdown when multiple exports exist.
+## Import your data
 
-The selected export is stored locally in the browser. It is not exposed in the visible app route.
+1. In Trade Republic, open **Settings → Export → Transaction history** and download the CSV.
+2. Drop the file into `exports/`, or use the **Import** button in the app header.
+3. If multiple exports exist, pick one from the header dropdown.
 
-## Features
+The active export is stored in `localStorage` — it is never appended to the URL.
 
-| View | What It Shows |
-|---|---|
-| Overview | Live portfolio value, allocation donut, allocation wall, range chart, positions, movers, quick stats |
-| Analytics | Monthly returns, annual P&L, allocation, geographic exposure, drawdown and risk metrics |
-| Holdings | Current positions, shares, average cost, market value, unrealized P&L, yield, concentration flags |
-| Cash flow | Cash balance history and inflow/outflow breakdown |
-| Income | Dividends, interest, stock perks, and dividend calendar |
-| Realized P&L | Closed trades with per-trade gains and losses |
-| Tax | Tax rows plus Freistellungsauftrag allowance tracker |
-| Watchlist | Persisted watchlist items with target prices |
-| Rebalance | Target weights and suggested buy/sell amounts |
-| Goals / FIRE | FIRE calculator, custom goal tracker, and projection |
+---
 
 ## Prices
 
-Prices are fetched through `yfinance`, cached briefly, and converted to EUR where needed. The default live cache window is 60 seconds and can be changed with:
+Prices are fetched from Yahoo Finance via `yfinance`, cached in memory, and converted to EUR where needed.
 
-```bash
-PRICE_REFRESH_SECONDS=120 make run
+- Automatic background refresh every 60 s while the browser tab is active
+- Manual **Refresh** button forces a live fetch bypassing the cache
+- `cache/` holds ISIN→ticker mappings (runtime state, git-ignored)
+- Set `PRICE_REFRESH_SECONDS=N` to change the in-memory TTL
+
+---
+
+## Project layout
+
 ```
-
-Ticker discovery results are cached under `cache/`. The cache is runtime state and is intentionally ignored by Git.
-
-## Watchlist Database
-
-The watchlist uses SQLite. Local runs create `portfolio.db` in the project root. Docker runs set `WATCHLIST_DB=db/portfolio.db`, which stores the database in the `kapital-db` named volume.
-
-`portfolio.db` is runtime data and should not be committed.
-
-## Project Layout
-
-```text
-api.py                  FastAPI entry point and SPA fallback
+api.py                  FastAPI entry point + SPA fallback (Cache-Control: no-store on index.html)
 app/
-  deps.py               Shared state cache and helpers
-  routers/              API routes
-portfolio/              CSV parsing, cash, holdings, prices, returns, SQLite watchlist
-src/                    React and TypeScript frontend
-exports/                CSV exports; sample data is committed
-nginx/                  Docker HTTPS reverse proxy
+  deps.py               In-memory state cache, shared across requests
+  routers/
+    portfolio.py        summary, holdings, performance, position_returns, tax, asset detail
+    analytics.py        analytics, geographic, FSA, dividend calendar
+    core.py             exports, upload, refresh_prices
+    watchlist.py        CRUD watchlist (SQLite)
+  schemas.py            Pydantic response models
+portfolio/
+  cash.py               Deposit/withdrawal parsing, income log, cash balance
+  holdings.py           Position and cost-basis calculation
+  performance.py        TWR, drawdown, benchmark series
+  prices.py             yfinance fetcher, ISIN→ticker mapping, EUR conversion
+  returns.py            XIRR, Sharpe, best/worst days
+  db.py                 SQLite watchlist schema
+src/                    React + TypeScript frontend (Vite)
+  App.tsx               Shell, routing, live-refresh loop, market status
+  api.ts                Typed fetch wrappers for all endpoints
+  components/
+    views/              One file per section (Overview, Analytics, Holdings, …)
+    charts/             HeroChart (ApexCharts wrapper)
+    ui/                 Card, Skeleton, ProgressBar, InfoModal, …
+  lib/                  format.ts, chart.ts, sections.ts
+exports/                CSV files — only sample-portfolio.csv is committed
+nginx/                  Nginx config + Dockerfile for Docker Compose
 ```
