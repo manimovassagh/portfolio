@@ -2,7 +2,7 @@
 """Portfolio data routes: summary, holdings, performance, cash, income, realized, tax, asset, sparklines."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, datetime, timezone
 
 import pandas as pd
 from fastapi import APIRouter, HTTPException
@@ -69,6 +69,15 @@ def get_summary(export: str | None = None) -> dict:
         "n_realized": len(realized),
         "holder_name": cash.holder_name(df),
         "first_trade_date": first_trade,
+    }
+
+
+@router.post("/api/refresh_prices")
+def refresh_prices(export: str | None = None) -> dict:
+    s = get_state(export, force_refresh=True)
+    return {
+        "export": s["export"].name,
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
 
 

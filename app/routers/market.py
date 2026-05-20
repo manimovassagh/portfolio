@@ -90,6 +90,7 @@ _RANGE_PARAMS: dict[str, dict] = {
     "6M":  {"period": "6mo", "interval": "1wk"},
     "1Y":  {"period": "1y",  "interval": "1wk"},
     "5Y":  {"period": "5y",  "interval": "1mo"},
+    "Max": {"period": "max", "interval": "1mo"},
 }
 
 
@@ -116,12 +117,23 @@ def market_history(ticker: str, range: str = "1M") -> dict:
     return {"series": series}
 
 
-@router.get("/api/market/news")
-def market_news(ticker: str) -> dict:
+def _fetch_raw_news(ticker: str) -> list:
+    """Return raw yfinance news items, falling back to a search-based query for tickers with no dedicated feed (e.g. EU ETFs)."""
     try:
         raw = yf.Ticker(ticker).news or []
     except Exception:
-        return {"news": []}
+        raw = []
+    if not raw:
+        try:
+            raw = yf.Search(ticker, news_count=10).news or []
+        except Exception:
+            pass
+    return raw
+
+
+@router.get("/api/market/news")
+def market_news(ticker: str) -> dict:
+    raw = _fetch_raw_news(ticker)
 
     articles = []
     for item in raw[:10]:

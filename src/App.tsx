@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Menu, Moon, RefreshCw, Sun, Upload, User, Wifi, X } from 'lucide-react';
+import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, Menu, Moon, RefreshCw, Star, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { listExports, loadAsset, loadDashboard, refreshPrices, uploadExport } from './api';
 import { sections } from './lib/sections';
@@ -19,6 +19,14 @@ const WatchlistView = lazy(() => import('./components/views/Watchlist').then((m)
 const RebalanceView = lazy(() => import('./components/views/Rebalance').then((m) => ({ default: m.RebalanceView })));
 const GoalsView   = lazy(() => import('./components/views/Goals').then((m) => ({ default: m.GoalsView })));
 const MarketsView = lazy(() => import('./components/views/Markets').then((m) => ({ default: m.MarketsView })));
+
+const NAV_GROUPS: Array<{ label: string; icon: typeof LayoutDashboard; items: SectionId[] }> = [
+  { label: 'Overview',  icon: LayoutDashboard, items: ['overview'] },
+  { label: 'Markets',   icon: Globe,           items: ['markets'] },
+  { label: 'Portfolio', icon: Briefcase,       items: ['holdings', 'analytics', 'rebalance'] },
+  { label: 'Finances',  icon: Wallet,          items: ['cash', 'income', 'realized', 'tax'] },
+  { label: 'Planning',  icon: Target,          items: ['watchlist', 'goals'] },
+];
 
 const sectionPaths: Record<SectionId, string> = {
   overview: '/overview',
@@ -226,6 +234,7 @@ export default function App() {
   };
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -280,13 +289,47 @@ export default function App() {
               <div className="text-xl font-semibold tracking-tight text-slate-900 dark:text-white">Kapital</div>
             </NavLink>
 
-            <nav className="hidden min-w-0 flex-1 items-center justify-start gap-1 overflow-x-auto xl:flex">
-              {sections.map(({ id, label, icon: Icon }) => {
-                const selected = active === id;
+            <nav className="hidden min-w-0 flex-1 items-center justify-start gap-0.5 xl:flex">
+              {NAV_GROUPS.map((group) => {
+                const isGroupActive = group.items.includes(active);
+                const isSingle = group.items.length === 1;
+                const GroupIcon = group.icon;
+                const baseBtn = `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition`;
+                const activeClass = `${baseBtn} bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white`;
+                const inactiveClass = `${baseBtn} text-slate-500 hover:bg-black/5 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-white`;
+
+                if (isSingle) {
+                  return (
+                    <NavLink key={group.label} to={sectionHref(group.items[0])} className={isGroupActive ? activeClass : inactiveClass}>
+                      <GroupIcon size={16} />{group.label}
+                    </NavLink>
+                  );
+                }
+
                 return (
-                  <NavLink key={id} to={sectionHref(id)} className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-md px-3 text-sm font-semibold transition ${selected ? 'bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'}`}>
-                    <Icon size={17} />{label}
-                  </NavLink>
+                  <div key={group.label} className="relative" onMouseEnter={() => setOpenGroup(group.label)} onMouseLeave={() => setOpenGroup(null)}>
+                    <button className={isGroupActive ? activeClass : inactiveClass}>
+                      <GroupIcon size={16} />{group.label}<ChevronDown size={12} className="opacity-50" />
+                    </button>
+                    {openGroup === group.label && (
+                      <div className="absolute left-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]">
+                        {group.items.map((sectionId) => {
+                          const sec = sections.find((s) => s.id === sectionId)!;
+                          const SecIcon = sec.icon;
+                          return (
+                            <NavLink
+                              key={sectionId}
+                              to={sectionHref(sectionId)}
+                              onClick={() => setOpenGroup(null)}
+                              className={`flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition hover:bg-slate-50 dark:hover:bg-slate-800 ${active === sectionId ? 'text-[#45b9a8]' : 'text-slate-700 dark:text-slate-300'}`}
+                            >
+                              <SecIcon size={16} />{sec.label}
+                            </NavLink>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 );
               })}
             </nav>

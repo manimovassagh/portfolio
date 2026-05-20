@@ -5,8 +5,8 @@ import { Card } from '../ui/Card';
 import { marketHistory, marketNews, marketQuote, marketSearch } from '../../api';
 import type { MarketCandle, MarketNewsItem, MarketQuote, MarketSearchResult } from '../../types';
 
-type Range = '1D' | '1W' | '1M' | '6M' | '1Y' | '5Y';
-const RANGES: Range[] = ['1D', '1W', '1M', '6M', '1Y', '5Y'];
+type Range = '1D' | '1W' | '1M' | '6M' | '1Y' | '5Y' | 'Max';
+const RANGES: Range[] = ['1D', '1W', '1M', '6M', '1Y', '5Y', 'Max'];
 
 function fmtPrice(n: number | null | undefined, currency?: string | null): string {
   if (n == null) return '—';
@@ -74,6 +74,7 @@ export function MarketsView() {
   const [query, setQuery]         = useState('AAPL — Apple Inc.');
   const [results, setResults]     = useState<MarketSearchResult[]>([]);
   const [showDrop, setShowDrop]   = useState(false);
+  const [inputFocused, setInputFocused] = useState(false);
   const [selected, setSelected]   = useState<MarketSearchResult | null>(DEFAULT);
   const [quote, setQuote]         = useState<MarketQuote | null>(null);
   const [candles, setCandles]     = useState<MarketCandle[]>([]);
@@ -87,7 +88,10 @@ export function MarketsView() {
   const searchRef   = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Load default on mount
+  // Show quick-pick panel in dropdown when focused with no search results
+  const showQuickPicks = inputFocused && results.length === 0;
+  const dropdownVisible = showDrop || showQuickPicks;
+
   useEffect(() => {
     loadQuoteAndChart(DEFAULT.ticker, '1M');
     setLoadingNews(true);
@@ -95,11 +99,11 @@ export function MarketsView() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Close dropdown on outside click
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
         setShowDrop(false);
+        setInputFocused(false);
       }
     };
     document.addEventListener('mousedown', handler);
@@ -140,6 +144,8 @@ export function MarketsView() {
     setSelected(result);
     setQuery(`${result.ticker} — ${result.name}`);
     setShowDrop(false);
+    setInputFocused(false);
+    setResults([]);
     setNews([]);
     loadQuoteAndChart(result.ticker, range);
     setLoadingNews(true);
@@ -178,23 +184,25 @@ export function MarketsView() {
   const chartSeries = [{ name: selected?.ticker ?? '', data: candles.map((c) => c.close) }];
 
   return (
-    <section className="space-y-6">
-      {/* Search */}
-      <Card className="p-5">
+    <section className="space-y-4">
+      {/* Search — compact single-row, quick picks live inside the dropdown */}
+      <Card className="p-4">
         <div ref={searchRef} className="relative">
           <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 focus-within:border-[#45b9a8] focus-within:ring-2 focus-within:ring-[#45b9a8]/20 dark:border-slate-700 dark:bg-slate-800/60">
             <Search size={18} className="shrink-0 text-slate-400" />
             <input
               className="flex-1 bg-transparent text-sm font-semibold text-slate-900 placeholder-slate-400 outline-none dark:text-slate-100"
-              placeholder="Search ticker or company name — e.g. AAPL, Tesla, VWCE.DE"
+              placeholder="Search ticker or company — or tap below for suggestions"
               value={query}
               onChange={(e) => handleInput(e.target.value)}
-              onFocus={() => results.length > 0 && setShowDrop(true)}
+              onFocus={() => setInputFocused(true)}
             />
           </div>
-          {showDrop && (
-            <div className="absolute left-0 right-0 top-full z-50 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]">
-              {results.map((r) => (
+
+          {dropdownVisible && (
+            <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-[70vh] overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]">
+              {/* Search results */}
+              {showDrop && results.map((r) => (
                 <button
                   key={r.ticker}
                   className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -205,36 +213,41 @@ export function MarketsView() {
                   <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-400 dark:bg-slate-700">{r.type}</span>
                 </button>
               ))}
+
+              {/* Quick pick suggestions when no search */}
+              {showQuickPicks && (
+                <div className="p-3 space-y-3">
+                  <div className="px-1 text-xs font-extrabold uppercase tracking-widest text-slate-400">Quick picks</div>
+                  {QUICK_PICKS.map((group) => (
+                    <div key={group.category}>
+                      <div className="mb-1.5 px-1 text-[10px] font-bold uppercase tracking-widest text-slate-300 dark:text-slate-600">
+                        {group.category}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {group.items.map((item) => {
+                          const active = selected?.ticker === item.ticker;
+                          return (
+                            <button
+                              key={item.ticker}
+                              onClick={() => selectStock(item)}
+                              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold transition ${
+                                active
+                                  ? 'border-[#45b9a8]/40 bg-[#45b9a8]/15 text-[#45b9a8]'
+                                  : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-[#45b9a8]/30 hover:bg-[#45b9a8]/8 hover:text-[#45b9a8] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                              }`}
+                            >
+                              <span className="num font-black">{item.ticker}</span>
+                              <span className="hidden text-slate-400 sm:inline">· {item.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
-
-        {/* Quick picks */}
-        <div className="mt-4 space-y-3">
-          {QUICK_PICKS.map((group) => (
-            <div key={group.category}>
-              <div className="mb-2 text-xs font-extrabold uppercase tracking-widest text-slate-400">{group.category}</div>
-              <div className="flex flex-wrap gap-2">
-                {group.items.map((item) => {
-                  const active = selected?.ticker === item.ticker;
-                  return (
-                    <button
-                      key={item.ticker}
-                      onClick={() => selectStock(item)}
-                      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
-                        active
-                          ? 'border-[#45b9a8]/40 bg-[#45b9a8]/15 text-[#45b9a8]'
-                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-[#45b9a8]/30 hover:bg-[#45b9a8]/8 hover:text-[#45b9a8] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
-                      }`}
-                    >
-                      <span className="num font-black">{item.ticker}</span>
-                      <span className="hidden text-slate-400 sm:inline">· {item.name}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
         </div>
       </Card>
 
@@ -245,9 +258,9 @@ export function MarketsView() {
       {selected && (
         <>
           {/* Quote panel */}
-          <Card className="p-5">
+          <Card className="p-4">
             {loadingQuote ? (
-              <div className="h-24 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              <div className="h-20 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
             ) : quote && (
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
@@ -266,16 +279,16 @@ export function MarketsView() {
               </div>
             )}
             {quote && (
-              <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
                 {[
                   { label: 'Day range',    value: `${fmtPrice(quote.day_low, quote.currency)} – ${fmtPrice(quote.day_high, quote.currency)}` },
                   { label: '52w range',    value: `${fmtPrice(quote.wk52_low, quote.currency)} – ${fmtPrice(quote.wk52_high, quote.currency)}` },
                   { label: 'Market cap',   value: fmtLargeNum(quote.market_cap) },
                   { label: 'Avg. volume',  value: fmtLargeNum(quote.volume) },
                 ].map((s) => (
-                  <div key={s.label} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
-                    <div className="text-xs font-extrabold uppercase tracking-wide text-slate-400">{s.label}</div>
-                    <div className="num mt-1 text-sm font-black text-slate-900 dark:text-white">{s.value}</div>
+                  <div key={s.label} className="rounded-lg bg-slate-50 p-2 dark:bg-slate-800">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-400">{s.label}</div>
+                    <div className="num mt-0.5 text-sm font-bold text-slate-900 dark:text-white">{s.value}</div>
                   </div>
                 ))}
               </div>
@@ -283,8 +296,8 @@ export function MarketsView() {
           </Card>
 
           {/* Chart */}
-          <Card className="p-5">
-            <div className="mb-4 flex items-center justify-between gap-3">
+          <Card className="p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
               <div className="text-sm font-black text-slate-900 dark:text-white">Price history</div>
               <div className="flex gap-1">
                 {RANGES.map((r) => (
@@ -296,17 +309,19 @@ export function MarketsView() {
               </div>
             </div>
             {loadingChart ? (
-              <div className="h-56 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
+              <div className="h-64 animate-pulse rounded-lg bg-slate-100 dark:bg-slate-800" />
             ) : candles.length > 0 ? (
-              <Chart options={chartOptions} series={chartSeries} type="area" height={240} />
+              <div className="h-64 sm:h-80">
+                <Chart options={chartOptions} series={chartSeries} type="area" height="100%" />
+              </div>
             ) : (
               <div className="flex h-40 items-center justify-center text-sm text-slate-400">No chart data available</div>
             )}
           </Card>
 
           {/* News */}
-          <Card className="p-5">
-            <div className="mb-4 flex items-center gap-2">
+          <Card className="p-4">
+            <div className="mb-3 flex items-center gap-2">
               <Newspaper size={17} className="text-slate-400" />
               <div className="text-sm font-black text-slate-900 dark:text-white">Latest news</div>
             </div>
@@ -318,7 +333,7 @@ export function MarketsView() {
               <div className="divide-y divide-slate-100 dark:divide-slate-800">
                 {news.map((item, i) => (
                   <a key={i} href={item.link} target="_blank" rel="noopener noreferrer"
-                    className="group flex items-start gap-3 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-5 px-5 transition">
+                    className="group flex items-start gap-3 py-3 hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-4 px-4 transition">
                     {item.thumbnail && (
                       <img src={item.thumbnail} alt="" className="mt-0.5 h-12 w-20 shrink-0 rounded object-cover" loading="lazy" />
                     )}

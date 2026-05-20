@@ -1,4 +1,4 @@
-.PHONY: run dev stop frontend build-frontend start-backend start-backend-dev typecheck install clean cache exports help
+.PHONY: run dev stop certs frontend build-frontend start-backend start-backend-dev docker docker-down docker-logs typecheck install clean cache exports help
 
 .DEFAULT_GOAL := help
 
@@ -12,9 +12,9 @@ SSL_CERTFILE ?= certs/cert.pem
 
 UVICORN_ARGS := $(APP_MODULE) --host $(HOST) --port $(PORT) --ssl-keyfile $(SSL_KEYFILE) --ssl-certfile $(SSL_CERTFILE)
 
-run: stop build-frontend start-backend
+run: stop certs build-frontend start-backend
 
-dev: stop build-frontend start-backend-dev
+dev: stop certs build-frontend start-backend-dev
 
 stop:
 	@pids="$$(lsof -tiTCP:$(PORT) -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')"; \
@@ -35,6 +35,19 @@ stop:
 		echo "No process listening on port $(PORT)."; \
 	fi
 
+certs:
+	@if [ ! -f "$(SSL_CERTFILE)" ] || [ ! -f "$(SSL_KEYFILE)" ]; then \
+		echo "Generating local self-signed TLS certificate in certs/"; \
+		mkdir -p certs; \
+		openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+			-keyout "$(SSL_KEYFILE)" \
+			-out "$(SSL_CERTFILE)" \
+			-subj "/CN=localhost" \
+			-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"; \
+	else \
+		echo "Using existing TLS certificate: $(SSL_CERTFILE)"; \
+	fi
+
 frontend: build-frontend
 
 build-frontend:
@@ -45,6 +58,15 @@ start-backend:
 
 start-backend-dev:
 	$(UV) run uvicorn $(UVICORN_ARGS) --reload
+
+docker: certs
+	docker compose up --build
+
+docker-down:
+	docker compose down
+
+docker-logs:
+	docker compose logs -f
 
 typecheck:
 	$(NPM) run typecheck
@@ -71,6 +93,10 @@ help:
 	@echo "  run                Stop PORT, build frontend, start backend"
 	@echo "  dev                Stop PORT, build frontend, start backend with reload"
 	@echo "  stop               Stop processes listening on PORT (default: 8765)"
+	@echo "  certs              Generate local self-signed HTTPS certs if missing"
+	@echo "  docker             Generate certs and run Docker Compose"
+	@echo "  docker-down        Stop Docker Compose"
+	@echo "  docker-logs        Follow Docker Compose logs"
 	@echo "  frontend           Alias for build-frontend"
 	@echo "  build-frontend     Build React/Vite frontend"
 	@echo "  start-backend      Start FastAPI backend only"
