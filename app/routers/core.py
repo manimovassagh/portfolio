@@ -7,7 +7,9 @@ import os
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 
-from app.deps import BASE_DIR, clear_cache
+import time
+
+from app.deps import BASE_DIR, _cache, clear_cache
 from portfolio import loader
 
 router = APIRouter()
@@ -19,6 +21,16 @@ _MAX_UPLOAD_BYTES = 10 * 1024 * 1024  # 10 MB
 @router.get("/", response_class=FileResponse)
 def index() -> FileResponse:
     return FileResponse(_DIST / "index.html")
+
+
+@router.get("/api/health")
+def health() -> dict:
+    exports = loader.list_exports()
+    cache_entries = []
+    for key, val in _cache.items():
+        age = int(time.time() - val.get("loaded_at", 0))
+        cache_entries.append({"key": key, "age_seconds": age})
+    return {"status": "ok", "exports": [p.name for p in exports], "cache": cache_entries}
 
 
 @router.get("/api/exports")

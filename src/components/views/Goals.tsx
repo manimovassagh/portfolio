@@ -22,25 +22,26 @@ function yearsToGoal(target: number, current: number, rate: number, monthly: num
 
 export function GoalsView({ data }: { data: DashboardData }) {
   const pv   = data.summary.portfolio_value;
-  const xirr = data.summary.xirr ?? 0.07;
+  const xirr = data.summary.xirr;
 
   const [targetValue,    setTargetValue]    = useState<number>(() => Number(localStorage.getItem('goal_target')   || 0));
   const [annualExpenses, setAnnualExpenses] = useState<number>(() => Number(localStorage.getItem('goal_expenses') || 0));
   const [monthlyContrib, setMonthlyContrib] = useState<number>(() => Number(localStorage.getItem('goal_monthly')  || 0));
+  const [planningRate,   setPlanningRate]   = useState<number>(() => Number(localStorage.getItem('goal_rate')     || 0.07));
 
   const save = (key: string, val: number) => localStorage.setItem(key, String(val));
 
   const fireNumber  = annualExpenses > 0 ? annualExpenses * 25 : null;
   const firePct     = fireNumber ? (pv / fireNumber) * 100 : null;
   const customPct   = targetValue > 0 ? (pv / targetValue) * 100 : null;
-  const yearsToFire   = fireNumber  ? yearsToGoal(fireNumber,  pv, xirr, monthlyContrib) : null;
-  const yearsToCustom = targetValue > 0 ? yearsToGoal(targetValue, pv, xirr, monthlyContrib) : null;
+  const yearsToFire   = fireNumber  ? yearsToGoal(fireNumber,  pv, planningRate, monthlyContrib) : null;
+  const yearsToCustom = targetValue > 0 ? yearsToGoal(targetValue, pv, planningRate, monthlyContrib) : null;
 
   return (
     <section className="space-y-6">
       <Card className="p-6">
         <PanelTitle title="Your inputs" subtitle="Saved automatically to this browser" />
-        <div className="grid gap-5 sm:grid-cols-3">
+        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className={labelCls}>Target portfolio (€)</label>
             <input type="number" min={0} value={targetValue || ''} placeholder="e.g. 500000" className={inputCls}
@@ -55,7 +56,14 @@ export function GoalsView({ data }: { data: DashboardData }) {
             <label className={labelCls}>Monthly contribution (€)</label>
             <input type="number" min={0} value={monthlyContrib || ''} placeholder="e.g. 1000" className={inputCls}
               onChange={(e) => { const v = Number(e.target.value); setMonthlyContrib(v); save('goal_monthly', v); }} />
-            <p className="mt-1 text-xs text-slate-400">Used in projection · XIRR: {xirr ? `${(xirr * 100).toFixed(1)}%` : '—'}</p>
+          </div>
+          <div>
+            <label className={labelCls}>Planning rate (% / yr)</label>
+            <input type="number" min={0} max={50} step={0.1} value={(planningRate * 100).toFixed(1)} className={inputCls}
+              onChange={(e) => { const v = Number(e.target.value) / 100; setPlanningRate(v); save('goal_rate', v); }} />
+            {xirr != null && (
+              <p className="mt-1 text-xs text-slate-400">Historical XIRR: {(xirr * 100).toFixed(1)}% — use conservatively</p>
+            )}
           </div>
         </div>
       </Card>
@@ -116,7 +124,7 @@ export function GoalsView({ data }: { data: DashboardData }) {
       </div>
 
       <Card className="p-6">
-        <PanelTitle title="Growth projection" subtitle={`Assumes ${(xirr * 100).toFixed(1)}% annual return (your XIRR) + €${monthlyContrib}/mo contributions`} />
+        <PanelTitle title="Growth projection" subtitle={`${(planningRate * 100).toFixed(1)}% annual return · €${monthlyContrib}/mo contributions`} />
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -130,7 +138,7 @@ export function GoalsView({ data }: { data: DashboardData }) {
               {Array.from({ length: 10 }, (_, i) => {
                 const yr = i + 1;
                 let bal = pv;
-                for (let y = 0; y < yr; y++) bal = bal * (1 + xirr) + monthlyContrib * 12;
+                for (let y = 0; y < yr; y++) bal = bal * (1 + planningRate) + monthlyContrib * 12;
                 return (
                   <tr key={yr} className="border-b border-slate-100 dark:border-slate-800">
                     <td className="py-2.5 font-bold text-slate-500">+{yr}y</td>

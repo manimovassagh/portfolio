@@ -165,8 +165,8 @@ def fetch_prices(isins: list[str], force_refresh: bool = False) -> dict[str, flo
         except Exception:
             continue
 
+    merged = {**cache.get("prices", {}), **prices}
     if prices:
-        merged = {**cache.get("prices", {}), **prices}
         _save_json(PRICE_CACHE_FILE, {"_date": today, "_fetched_at": time.time(), "prices": merged})
 
-    return prices
+    return {isin: float(merged[isin]) for isin in isins if isin in merged}

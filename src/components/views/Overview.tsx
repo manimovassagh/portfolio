@@ -202,8 +202,9 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
         const holding = allocationHoldings[dataPointIndex];
         if (!holding) return '';
         const color = tileColor(holding.unrealized_pct ?? 0);
+        const safeName = holding.name.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
         return `<div style="padding:10px 12px;font-size:12px;font-family:Inter,sans-serif">
-          <div style="max-width:240px;font-weight:800;margin-bottom:6px">${holding.name}</div>
+          <div style="max-width:240px;font-weight:800;margin-bottom:6px">${safeName}</div>
           <div>Market value: <b>${fmtEUR(holding.market_value)}</b></div>
           <div>Weight: <b>${holding.weight.toFixed(1)}%</b></div>
           <div>P/L: <b style="color:${color}">${signedEUR(holding.unrealized_pnl)} (${pct(holding.unrealized_pct)})</b></div>

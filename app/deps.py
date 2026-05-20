@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 import os
+import threading
 import time
 from datetime import date, datetime
 from pathlib import Path
@@ -17,6 +18,7 @@ from portfolio import cash, loader, performance, positions, prices
 BASE_DIR = Path(__file__).resolve().parent.parent  # project root
 
 _cache: dict[str, Any] = {}
+_lock = threading.Lock()
 
 
 def to_float(v: Any) -> float | None:
@@ -30,7 +32,7 @@ def to_float(v: Any) -> float | None:
     return None if (math.isnan(f) or math.isinf(f)) else f
 
 
-def get_state(export_name: str | None = None) -> dict[str, Any]:
+def get_state(export_name: str | None = None, force_refresh: bool = False) -> dict[str, Any]:
     """Load and cache portfolio state for the given export file."""
     exports = loader.list_exports()
     if not exports:
@@ -45,14 +47,15 @@ def get_state(export_name: str | None = None) -> dict[str, Any]:
 
     key = f"{chosen.name}-{chosen.stat().st_mtime}"
     ttl_seconds = int(os.environ.get("PRICE_REFRESH_SECONDS", "60"))
-    cached = _cache.get(key)
-    if cached and time.time() - cached.get("loaded_at", 0) < ttl_seconds:
-        return _cache[key]
+    with _lock:
+        cached = _cache.get(key)
+        if not force_refresh and cached and time.time() - cached.get("loaded_at", 0) < ttl_seconds:
+            return _cache[key]
 
     df = loader.load(chosen)
     holdings, realized = positions.compute_holdings(df)
     isins = list(holdings.keys())
-    live = prices.fetch_prices(isins)
+    live = prices.fetch_prices(isins, force_refresh=force_refresh)
     perf = performance.performance_series(df)
     summary = cash.summarize(df)
 
@@ -67,19 +70,19 @@ def get_state(export_name: str | None = None) -> dict[str, Any]:
                 if series:
                     spark_data[isin] = [float(v) for v in series]
 
-    _cache.clear()
-    _cache[key] = {
-        "export": chosen,
-        "df": df,
-        "holdings": holdings,
-        "realized": realized,
-        "prices": live,
-        "perf": perf,
-        "summary": summary,
-        "spark_data": spark_data,
-        "exports": [p.name for p in exports],
-        "loaded_at": time.time(),
-    }
+    with _lock:
+        _cache[key] = {
+            "export": chosen,
+            "df": df,
+            "holdings": holdings,
+            "realized": realized,
+            "prices": live,
+            "perf": perf,
+            "summary": summary,
+            "spark_data": spark_data,
+            "exports": [p.name for p in exports],
+            "loaded_at": time.time(),
+        }
     return _cache[key]
 
 

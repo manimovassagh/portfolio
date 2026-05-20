@@ -1,10 +1,11 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { Activity, Moon, RefreshCw, Sun, Upload, User, Wifi } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Activity, Menu, Moon, RefreshCw, Sun, Upload, User, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { listExports, loadAsset, loadDashboard, uploadExport } from './api';
+import { listExports, loadAsset, loadDashboard, refreshPrices, uploadExport } from './api';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
 import { SkeletonDashboard, EmptyState } from './components/ui/Skeleton';
+import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import type { AssetDetail, ChartMode, DashboardData, ExportName, Holding, SectionId } from './types';
 
 const Overview = lazy(() => import('./components/views/Overview').then((m) => ({ default: m.Overview })));
@@ -141,6 +142,13 @@ export default function App() {
   const refresh = useCallback(async (name = exportName) => {
     if (!name) return;
     clearExportParam();
+    setLoading(true);
+    setError(null);
+    try {
+      await refreshPrices(name);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Price refresh failed');
+    }
     await loadByName(name);
   }, [clearExportParam, exportName, loadByName]);
 
@@ -215,6 +223,22 @@ export default function App() {
     await loadByName(payload.filename);
   };
 
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(e.target as Node)) {
+        setMobileMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [mobileMenuOpen]);
+
+  useEffect(() => { setMobileMenuOpen(false); }, [active]);
+
   const holderName   = data?.summary.holder_name;
   const initials     = holderName?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
@@ -222,18 +246,20 @@ export default function App() {
   const routeContent = useMemo(() => {
     if (!data) return null;
     return (
-      <Suspense fallback={<SkeletonDashboard />}>
-        {active === 'overview'  && <Overview data={data} dark={dark} chartMode={chartMode} setChartMode={setChartMode} openAsset={openAsset} navigate={navigate} />}
-        {active === 'analytics' && <AnalyticsView data={data} dark={dark} />}
-        {active === 'holdings'  && <HoldingsView data={data} openAsset={openAsset} />}
-        {active === 'cash'      && <CashView data={data} dark={dark} />}
-        {active === 'income'    && <IncomeView data={data} />}
-        {active === 'realized'  && <RealizedView data={data} />}
-        {active === 'tax'       && <TaxView data={data} exportName={exportName} />}
-        {active === 'watchlist' && <WatchlistView exportName={exportName} />}
-        {active === 'rebalance' && <RebalanceView data={data} />}
-        {active === 'goals'     && <GoalsView data={data} />}
-      </Suspense>
+      <ErrorBoundary>
+        <Suspense fallback={<SkeletonDashboard />}>
+          {active === 'overview'  && <Overview data={data} dark={dark} chartMode={chartMode} setChartMode={setChartMode} openAsset={openAsset} navigate={navigate} />}
+          {active === 'analytics' && <AnalyticsView data={data} dark={dark} />}
+          {active === 'holdings'  && <HoldingsView data={data} openAsset={openAsset} />}
+          {active === 'cash'      && <CashView data={data} dark={dark} />}
+          {active === 'income'    && <IncomeView data={data} />}
+          {active === 'realized'  && <RealizedView data={data} />}
+          {active === 'tax'       && <TaxView data={data} exportName={exportName} />}
+          {active === 'watchlist' && <WatchlistView exportName={exportName} />}
+          {active === 'rebalance' && <RebalanceView data={data} />}
+          {active === 'goals'     && <GoalsView data={data} />}
+        </Suspense>
+      </ErrorBoundary>
     );
   }, [active, chartMode, dark, data, exportName, navigate, openAsset]);
 
@@ -263,6 +289,13 @@ export default function App() {
             </nav>
 
             <div className="ml-auto flex items-center gap-2">
+                <button
+                  className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-3 text-slate-700 shadow-sm hover:bg-slate-50 xl:hidden dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
+                  onClick={() => setMobileMenuOpen((v) => !v)}
+                  aria-label="Open navigation"
+                >
+                  {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+                </button>
                 <button
                   onClick={() => setLiveRefresh((v) => !v)}
                   className={`hidden h-10 items-center gap-2 rounded-md border px-3 text-sm font-black shadow-sm sm:inline-flex ${
@@ -296,6 +329,22 @@ export default function App() {
               </div>
             </div>
         </header>
+
+        {mobileMenuOpen && (
+          <div ref={mobileMenuRef} className="fixed inset-x-0 top-[68px] z-40 border-b border-black/10 bg-white/95 backdrop-blur-xl xl:hidden dark:border-[#2b2b2b] dark:bg-[#242424]/98">
+            <nav className="mx-auto flex max-w-[1580px] flex-col gap-1 px-5 py-3 lg:px-8">
+              {sections.map(({ id, label, icon: Icon }) => (
+                <NavLink
+                  key={id}
+                  to={sectionHref(id)}
+                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition ${active === id ? 'bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'}`}
+                >
+                  <Icon size={17} />{label}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        )}
 
           <div className="mx-auto max-w-[1580px] space-y-6 px-5 py-8 lg:px-8">
             <div className="flex items-end justify-between gap-4">
