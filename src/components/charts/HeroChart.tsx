@@ -7,13 +7,21 @@ interface HeroChartProps {
   data: DashboardData;
   dark: boolean;
   mode: ChartMode;
+  height?: number;
+  showLegend?: boolean;
+  minimal?: boolean;
 }
 
-export function HeroChart({ data, dark, mode }: HeroChartProps) {
+export function HeroChart({ data, dark, mode, height = 360, showLegend = true, minimal = false }: HeroChartProps) {
   const t = chartTheme(dark);
-  const money = mode === 'Value';
+  const money = mode === 'Value' && !minimal;
+  const firstMeaningfulTwr = data.perf.twr.findIndex((p) => Math.abs(p.twr) > 0.001);
+  const minimalTwr = firstMeaningfulTwr > -1 ? data.perf.twr.slice(firstMeaningfulTwr) : data.perf.twr;
 
   const series =
+    minimal
+      ? [{ name: 'Performance', data: minimalTwr.map((p) => ({ x: p.date, y: p.twr })) }]
+      :
     mode === 'Value'
       ? [
           { name: 'Portfolio', data: data.perf.series.map((p) => ({ x: p.date, y: p.portfolio_value })) },
@@ -29,18 +37,19 @@ export function HeroChart({ data, dark, mode }: HeroChartProps) {
   return (
     <Chart
       type="area"
-      height={360}
+      height={height}
       series={series}
       options={{
         ...t,
-        colors: ['#10b981', '#6366f1', '#f59e0b'],
-        stroke: { curve: 'smooth', width: [3, 2, 2] },
-        fill: { type: 'gradient', gradient: { opacityFrom: 0.25, opacityTo: 0 } },
-        xaxis: { type: 'datetime' },
-        yaxis: { labels: { formatter: (v) => money ? fmtEUR(v) : pct(v, 2) } },
-        tooltip: { x: { format: 'dd MMM yyyy' }, y: { formatter: (v) => money ? fmtEUR(v) : pct(v, 2) } },
+        colors: ['#6ee787', '#64748b', '#f59e0b'],
+        grid: minimal ? { show: false } : t.grid,
+        stroke: { curve: 'smooth', width: minimal ? [3, 0, 0] : [3, 2, 2] },
+        fill: { type: 'gradient', gradient: { opacityFrom: minimal ? 0.08 : 0.25, opacityTo: 0 } },
+        xaxis: minimal ? { type: 'datetime', labels: { show: false }, axisBorder: { show: false }, axisTicks: { show: false }, tooltip: { enabled: false } } : { type: 'datetime' },
+        yaxis: minimal ? { show: false } : { labels: { formatter: (v) => money ? fmtEUR(v) : pct(v, 2) } },
+        tooltip: { ...t.tooltip, x: { format: 'dd MMM yyyy' }, y: { formatter: (v) => money ? fmtEUR(v) : pct(v, 2) } },
         dataLabels: { enabled: false },
-        legend: { position: 'top', horizontalAlign: 'right', labels: { colors: dark ? '#cbd5e1' : '#475569' } },
+        legend: { show: showLegend, position: 'top', horizontalAlign: 'right', labels: { colors: dark ? '#cbd5e1' : '#475569' } },
       }}
     />
   );

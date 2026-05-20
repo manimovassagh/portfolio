@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import os
+import time
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -42,7 +44,9 @@ def get_state(export_name: str | None = None) -> dict[str, Any]:
         chosen = exports[0]
 
     key = f"{chosen.name}-{chosen.stat().st_mtime}"
-    if key in _cache:
+    ttl_seconds = int(os.environ.get("PRICE_REFRESH_SECONDS", "60"))
+    cached = _cache.get(key)
+    if cached and time.time() - cached.get("loaded_at", 0) < ttl_seconds:
         return _cache[key]
 
     df = loader.load(chosen)
@@ -74,6 +78,7 @@ def get_state(export_name: str | None = None) -> dict[str, Any]:
         "summary": summary,
         "spark_data": spark_data,
         "exports": [p.name for p in exports],
+        "loaded_at": time.time(),
     }
     return _cache[key]
 

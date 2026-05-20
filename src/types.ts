@@ -45,6 +45,9 @@ export type Holding = {
   ttm_yield: number | null;
 };
 
+export type PositionRange = '1D' | '1W' | '1M' | 'YTD' | '1Y';
+export type PositionReturns = Record<string, Record<PositionRange, { pnl: number | null; pct: number | null }>>;
+
 export type Performance = {
   series: Array<{ date: string; portfolio_value: number | null; contributions: number | null; holdings_value: number | null }>;
   drawdown: Array<{ date: string; drawdown: number }>;
@@ -141,6 +144,7 @@ export type DashboardData = {
   exports: ExportName[];
   summary: Summary;
   holdings: Holding[];
+  positionReturns: PositionReturns;
   totalMV: number;
   perf: Performance;
   cashFlow: CashFlow;

@@ -11,6 +11,7 @@ For European ETFs we prefer XETRA (.DE) tickers as they're EUR-denominated.
 from __future__ import annotations
 
 import json
+import os
 import time
 from datetime import date
 from pathlib import Path
@@ -119,14 +120,20 @@ def _fetch_fx_rate(from_ccy: str, to_ccy: str = "EUR") -> float:
 
 
 def fetch_prices(isins: list[str], force_refresh: bool = False) -> dict[str, float]:
-    """Fetch latest prices for the given ISINs, converted to EUR. Cached daily."""
+    """Fetch latest prices for the given ISINs, converted to EUR.
+
+    Cached briefly so the dashboard can live-refresh without hammering Yahoo.
+    """
     if not isins:
         return {}
 
     cache = _load_json(PRICE_CACHE_FILE)
     today = date.today().isoformat()
+    ttl_seconds = int(os.environ.get("PRICE_REFRESH_SECONDS", "60"))
+    fetched_at = float(cache.get("_fetched_at", 0) or 0)
+    cache_is_fresh = time.time() - fetched_at < ttl_seconds
 
-    if not force_refresh and cache.get("_date") == today:
+    if not force_refresh and cache.get("_date") == today and cache_is_fresh:
         cached_prices = cache.get("prices", {})
         if all(isin in cached_prices for isin in isins):
             return {isin: float(cached_prices[isin]) for isin in isins}
@@ -160,6 +167,6 @@ def fetch_prices(isins: list[str], force_refresh: bool = False) -> dict[str, flo
 
     if prices:
         merged = {**cache.get("prices", {}), **prices}
-        _save_json(PRICE_CACHE_FILE, {"_date": today, "prices": merged})
+        _save_json(PRICE_CACHE_FILE, {"_date": today, "_fetched_at": time.time(), "prices": merged})
 
     return prices

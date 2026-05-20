@@ -8,7 +8,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 
 from app.deps import get_state, serialize_dates, to_float
-from portfolio import benchmark, cash, returns
+from portfolio import benchmark, cash, performance, returns
 
 router = APIRouter()
 
@@ -275,6 +275,54 @@ def get_asset(isin: str, export: str | None = None) -> dict:
             "unrealized": ((cur * h.shares) - h.cost_basis) if (h and cur) else None,
         },
     }
+
+
+@router.get("/api/position_returns")
+def get_position_returns(export: str | None = None) -> dict:
+    s = get_state(export)
+    holdings, live = s["holdings"], s["prices"]
+    isins = list(holdings.keys())
+    today = pd.Timestamp.now().normalize()
+    first_trade = s["df"].loc[s["df"]["category"] == "TRADING", "date"].min()
+    start = min(
+        today - pd.DateOffset(years=1, days=7),
+        pd.Timestamp(first_trade).normalize() if pd.notna(first_trade) else today,
+    )
+    hist = performance._historical_prices(isins, start, today)
+
+    windows = {
+        "1D": today - pd.DateOffset(days=1),
+        "1W": today - pd.DateOffset(weeks=1),
+        "1M": today - pd.DateOffset(months=1),
+        "YTD": pd.Timestamp(year=today.year, month=1, day=1),
+        "1Y": today - pd.DateOffset(years=1),
+    }
+
+    payload: dict[str, dict[str, dict[str, float | None]]] = {}
+    for isin, h in holdings.items():
+        cur = live.get(isin)
+        current_value = (cur * h.shares) if cur else None
+        payload[isin] = {}
+        if current_value is None or hist.empty or isin not in hist.columns:
+            for label in windows:
+                payload[isin][label] = {"pnl": None, "pct": None}
+            continue
+
+        series = hist[isin].dropna()
+        for label, target in windows.items():
+            past = series[series.index <= target]
+            if past.empty:
+                payload[isin][label] = {"pnl": None, "pct": None}
+                continue
+            start_price = float(past.iloc[-1])
+            start_value = start_price * h.shares
+            pnl = current_value - start_value
+            payload[isin][label] = {
+                "pnl": to_float(pnl),
+                "pct": to_float((pnl / start_value * 100) if start_value else None),
+            }
+
+    return {"returns": payload}
 
 
 @router.get("/api/sparklines")
