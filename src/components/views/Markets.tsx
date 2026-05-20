@@ -24,6 +24,52 @@ function fmtLargeNum(n: number | null | undefined): string {
 
 const DEFAULT: MarketSearchResult = { ticker: 'AAPL', name: 'Apple Inc.', type: 'EQUITY', exchange: 'NMS' };
 
+const QUICK_PICKS: Array<{ category: string; items: MarketSearchResult[] }> = [
+  {
+    category: 'Popular ETFs',
+    items: [
+      { ticker: 'VWCE.DE', name: 'Vanguard FTSE All-World',    type: 'ETF',    exchange: 'XETRA' },
+      { ticker: 'EUNL.DE', name: 'iShares MSCI World',         type: 'ETF',    exchange: 'XETRA' },
+      { ticker: 'SXR8.DE', name: 'iShares Core S&P 500',       type: 'ETF',    exchange: 'XETRA' },
+      { ticker: 'EXXT.DE', name: 'iShares NASDAQ 100',         type: 'ETF',    exchange: 'XETRA' },
+      { ticker: 'XDWD.DE', name: 'Xtrackers MSCI World',       type: 'ETF',    exchange: 'XETRA' },
+      { ticker: 'VUSA.L',  name: 'Vanguard S&P 500 (GBP)',     type: 'ETF',    exchange: 'LSE'   },
+    ],
+  },
+  {
+    category: 'US Stocks',
+    items: [
+      { ticker: 'AAPL',    name: 'Apple',                      type: 'EQUITY', exchange: 'NASDAQ' },
+      { ticker: 'MSFT',    name: 'Microsoft',                  type: 'EQUITY', exchange: 'NASDAQ' },
+      { ticker: 'NVDA',    name: 'Nvidia',                     type: 'EQUITY', exchange: 'NASDAQ' },
+      { ticker: 'GOOGL',   name: 'Alphabet',                   type: 'EQUITY', exchange: 'NASDAQ' },
+      { ticker: 'AMZN',    name: 'Amazon',                     type: 'EQUITY', exchange: 'NASDAQ' },
+      { ticker: 'META',    name: 'Meta',                       type: 'EQUITY', exchange: 'NASDAQ' },
+      { ticker: 'TSLA',    name: 'Tesla',                      type: 'EQUITY', exchange: 'NASDAQ' },
+    ],
+  },
+  {
+    category: 'EU Stocks',
+    items: [
+      { ticker: 'SAP.DE',  name: 'SAP',                        type: 'EQUITY', exchange: 'XETRA' },
+      { ticker: 'ASML.AS', name: 'ASML',                       type: 'EQUITY', exchange: 'AEX'   },
+      { ticker: 'SIE.DE',  name: 'Siemens',                    type: 'EQUITY', exchange: 'XETRA' },
+      { ticker: 'ALV.DE',  name: 'Allianz',                    type: 'EQUITY', exchange: 'XETRA' },
+      { ticker: 'VOW3.DE', name: 'Volkswagen',                  type: 'EQUITY', exchange: 'XETRA' },
+      { ticker: 'BMW.DE',  name: 'BMW',                        type: 'EQUITY', exchange: 'XETRA' },
+    ],
+  },
+  {
+    category: 'Crypto',
+    items: [
+      { ticker: 'BTC-EUR', name: 'Bitcoin',                    type: 'CRYPTOCURRENCY', exchange: 'CCC' },
+      { ticker: 'ETH-EUR', name: 'Ethereum',                   type: 'CRYPTOCURRENCY', exchange: 'CCC' },
+      { ticker: 'SOL-EUR', name: 'Solana',                     type: 'CRYPTOCURRENCY', exchange: 'CCC' },
+      { ticker: 'XRP-EUR', name: 'XRP',                        type: 'CRYPTOCURRENCY', exchange: 'CCC' },
+    ],
+  },
+];
+
 export function MarketsView() {
   const [query, setQuery]         = useState('AAPL — Apple Inc.');
   const [results, setResults]     = useState<MarketSearchResult[]>([]);
@@ -161,6 +207,34 @@ export function MarketsView() {
               ))}
             </div>
           )}
+        </div>
+
+        {/* Quick picks */}
+        <div className="mt-4 space-y-3">
+          {QUICK_PICKS.map((group) => (
+            <div key={group.category}>
+              <div className="mb-2 text-xs font-extrabold uppercase tracking-widest text-slate-400">{group.category}</div>
+              <div className="flex flex-wrap gap-2">
+                {group.items.map((item) => {
+                  const active = selected?.ticker === item.ticker;
+                  return (
+                    <button
+                      key={item.ticker}
+                      onClick={() => selectStock(item)}
+                      className={`flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-xs font-bold transition ${
+                        active
+                          ? 'border-[#45b9a8]/40 bg-[#45b9a8]/15 text-[#45b9a8]'
+                          : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-[#45b9a8]/30 hover:bg-[#45b9a8]/8 hover:text-[#45b9a8] dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300'
+                      }`}
+                    >
+                      <span className="num font-black">{item.ticker}</span>
+                      <span className="hidden text-slate-400 sm:inline">· {item.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </Card>
 
