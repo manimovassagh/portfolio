@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.deps import BASE_DIR
-from app.routers import analytics, core, portfolio, watchlist
+from app.routers import analytics, core, market, portfolio, watchlist
 from portfolio import db
 
 app = FastAPI(title="Trade Republic Portfolio")
@@ -24,6 +24,7 @@ app.include_router(core.router)
 app.include_router(portfolio.router)
 app.include_router(analytics.router)
 app.include_router(watchlist.router)
+app.include_router(market.router)
 
 
 @app.get("/{full_path:path}", response_class=FileResponse)

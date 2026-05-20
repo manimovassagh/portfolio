@@ -9,6 +9,10 @@ import type {
   GeographicData,
   Holding,
   IncomeRow,
+  MarketCandle,
+  MarketNewsItem,
+  MarketQuote,
+  MarketSearchResult,
   Performance,
   PositionReturns,
   RealizedRow,
@@ -80,6 +84,25 @@ export async function fetchGeographic(exportName: ExportName): Promise<Geographi
 export async function fetchFsa(exportName: ExportName, joint = false): Promise<FsaData> {
   const q = new URLSearchParams({ export: exportName, joint: String(joint) });
   return getJson<FsaData>(`/api/fsa?${q}`);
+}
+
+export async function marketSearch(q: string): Promise<MarketSearchResult[]> {
+  const data = await getJson<{ results: MarketSearchResult[] }>(`/api/market/search?q=${encodeURIComponent(q)}`);
+  return data.results;
+}
+
+export async function marketQuote(ticker: string): Promise<MarketQuote> {
+  return getJson<MarketQuote>(`/api/market/quote?ticker=${encodeURIComponent(ticker)}`);
+}
+
+export async function marketHistory(ticker: string, range: string): Promise<MarketCandle[]> {
+  const data = await getJson<{ series: MarketCandle[] }>(`/api/market/history?ticker=${encodeURIComponent(ticker)}&range=${range}`);
+  return data.series;
+}
+
+export async function marketNews(ticker: string): Promise<MarketNewsItem[]> {
+  const data = await getJson<{ news: MarketNewsItem[] }>(`/api/market/news?ticker=${encodeURIComponent(ticker)}`);
+  return data.news;
 }
 
 export async function fetchWatchlist(): Promise<WatchlistData> {

@@ -4,6 +4,7 @@ import {
   BarChart2,
   Briefcase,
   CheckCircle2,
+  Globe,
   LayoutDashboard,
   Receipt,
   Sliders,
@@ -24,6 +25,7 @@ export const sections: Array<{ id: SectionId; label: string; icon: typeof Layout
   { id: 'watchlist', label: 'Watchlist',     icon: Star },
   { id: 'rebalance', label: 'Rebalance',     icon: Sliders },
   { id: 'goals',     label: 'Goals / FIRE',  icon: Target },
+  { id: 'markets',   label: 'Markets',       icon: Globe },
 ];
 
 export { Activity };

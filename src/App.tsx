@@ -17,7 +17,8 @@ const RealizedView = lazy(() => import('./components/views/Realized').then((m) =
 const TaxView = lazy(() => import('./components/views/Tax').then((m) => ({ default: m.TaxView })));
 const WatchlistView = lazy(() => import('./components/views/Watchlist').then((m) => ({ default: m.WatchlistView })));
 const RebalanceView = lazy(() => import('./components/views/Rebalance').then((m) => ({ default: m.RebalanceView })));
-const GoalsView = lazy(() => import('./components/views/Goals').then((m) => ({ default: m.GoalsView })));
+const GoalsView   = lazy(() => import('./components/views/Goals').then((m) => ({ default: m.GoalsView })));
+const MarketsView = lazy(() => import('./components/views/Markets').then((m) => ({ default: m.MarketsView })));
 
 const sectionPaths: Record<SectionId, string> = {
   overview: '/overview',
@@ -30,6 +31,7 @@ const sectionPaths: Record<SectionId, string> = {
   watchlist: '/watchlist',
   rebalance: '/rebalance',
   goals: '/goals',
+  markets: '/markets',
 };
 
 function sectionFromPath(pathname: string): SectionId {
@@ -258,6 +260,7 @@ export default function App() {
           {active === 'watchlist' && <WatchlistView exportName={exportName} />}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
+          {active === 'markets'   && <MarketsView />}
         </Suspense>
       </ErrorBoundary>
     );

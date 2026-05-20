@@ -1,6 +1,6 @@
 export type ExportName = string;
 
-export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance' | 'goals';
+export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance' | 'goals' | 'markets';
 export type ChartMode = 'Value' | 'TWR' | 'Drawdown';
 
 export type Summary = {
@@ -138,6 +138,38 @@ export type WatchlistData = { items: WatchlistItem[] };
 
 export type DividendCalendarData = {
   upcoming: Array<{ isin: string; name: string; last_dividend_date: string; last_amount: number }>;
+};
+
+export type MarketSearchResult = {
+  ticker: string;
+  name: string;
+  type: string;
+  exchange: string;
+};
+
+export type MarketQuote = {
+  ticker: string;
+  price: number | null;
+  prev_close: number | null;
+  change: number | null;
+  change_pct: number | null;
+  day_high: number | null;
+  day_low: number | null;
+  wk52_high: number | null;
+  wk52_low: number | null;
+  market_cap: number | null;
+  currency: string | null;
+  volume: number | null;
+};
+
+export type MarketCandle = { date: string; close: number; volume: number | null };
+
+export type MarketNewsItem = {
+  title: string;
+  publisher: string;
+  link: string;
+  date: string | null;
+  thumbnail: string | null;
 };
 
 export type DashboardData = {
