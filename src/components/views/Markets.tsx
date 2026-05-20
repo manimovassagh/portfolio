@@ -22,11 +22,13 @@ function fmtLargeNum(n: number | null | undefined): string {
   return n.toLocaleString();
 }
 
+const DEFAULT: MarketSearchResult = { ticker: 'AAPL', name: 'Apple Inc.', type: 'EQUITY', exchange: 'NMS' };
+
 export function MarketsView() {
-  const [query, setQuery]         = useState('');
+  const [query, setQuery]         = useState('AAPL — Apple Inc.');
   const [results, setResults]     = useState<MarketSearchResult[]>([]);
   const [showDrop, setShowDrop]   = useState(false);
-  const [selected, setSelected]   = useState<MarketSearchResult | null>(null);
+  const [selected, setSelected]   = useState<MarketSearchResult | null>(DEFAULT);
   const [quote, setQuote]         = useState<MarketQuote | null>(null);
   const [candles, setCandles]     = useState<MarketCandle[]>([]);
   const [news, setNews]           = useState<MarketNewsItem[]>([]);
@@ -36,8 +38,16 @@ export function MarketsView() {
   const [loadingNews, setLoadingNews]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
 
-  const searchRef  = useRef<HTMLDivElement>(null);
+  const searchRef   = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Load default on mount
+  useEffect(() => {
+    loadQuoteAndChart(DEFAULT.ticker, '1M');
+    setLoadingNews(true);
+    marketNews(DEFAULT.ticker).then(setNews).catch(() => setNews([])).finally(() => setLoadingNews(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Close dropdown on outside click
   useEffect(() => {
