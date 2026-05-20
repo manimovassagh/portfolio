@@ -64,6 +64,11 @@ export async function loadDashboard(exportName: ExportName): Promise<DashboardDa
   };
 }
 
+export async function refreshPrices(exportName: ExportName): Promise<void> {
+  const response = await fetch(`/api/refresh_prices?export=${encodeURIComponent(exportName)}`, { method: 'POST' });
+  if (!response.ok) throw new Error(`Price refresh failed with HTTP ${response.status}`);
+}
+
 export async function loadAsset(isin: string, exportName: ExportName): Promise<AssetDetail> {
   return getJson<AssetDetail>(`/api/asset/${encodeURIComponent(isin)}?export=${encodeURIComponent(exportName)}`);
 }
@@ -72,8 +77,9 @@ export async function fetchGeographic(exportName: ExportName): Promise<Geographi
   return getJson<GeographicData>(`/api/geographic?export=${encodeURIComponent(exportName)}`);
 }
 
-export async function fetchFsa(exportName: ExportName): Promise<FsaData> {
-  return getJson<FsaData>(`/api/fsa?export=${encodeURIComponent(exportName)}`);
+export async function fetchFsa(exportName: ExportName, joint = false): Promise<FsaData> {
+  const q = new URLSearchParams({ export: exportName, joint: String(joint) });
+  return getJson<FsaData>(`/api/fsa?${q}`);
 }
 
 export async function fetchWatchlist(): Promise<WatchlistData> {

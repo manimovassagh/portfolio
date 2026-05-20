@@ -121,7 +121,7 @@ export type FsaData = {
   limit: number;
   used: number;
   remaining: number;
-  breakdown: { dividends: number; interest: number; stockperks: number; realized_gains: number };
+  breakdown: { dividends: number; interest: number; stockperks: number; vorabpauschale: number; realized_gains: number };
 };
 
 export type WatchlistItem = {

@@ -15,10 +15,11 @@ interface TaxViewProps {
 
 export function TaxView({ data, exportName }: TaxViewProps) {
   const [fsa, setFsa] = useState<FsaData | null>(null);
+  const [joint, setJoint] = useState(() => localStorage.getItem('fsa_joint') === 'true');
 
   useEffect(() => {
-    fetchFsa(exportName).catch(() => null).then((d) => { if (d) setFsa(d); });
-  }, [exportName]);
+    fetchFsa(exportName, joint).catch(() => null).then((d) => { if (d) setFsa(d); });
+  }, [exportName, joint]);
 
   const usedPct = fsa ? (fsa.used / fsa.limit) * 100 : 0;
   const isWithinAllowance = fsa ? fsa.used <= fsa.limit : true;
@@ -31,7 +32,15 @@ export function TaxView({ data, exportName }: TaxViewProps) {
     <section className="space-y-6">
       {fsa && (
         <Card className="p-5">
-          <PanelTitle title={`FSA tracker — ${fsa.year}`} subtitle="Annual tax-free savings allowance usage" />
+          <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+            <PanelTitle title={`FSA tracker — ${fsa.year}`} subtitle="Annual tax-free savings allowance usage" />
+            <button
+              onClick={() => { const v = !joint; setJoint(v); localStorage.setItem('fsa_joint', String(v)); }}
+              className={`shrink-0 rounded-md border px-3 py-1.5 text-xs font-black transition ${joint ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' : 'border-slate-200 bg-slate-50 text-slate-500 dark:border-slate-700 dark:bg-slate-800'}`}
+            >
+              {joint ? 'Joint filing (€2,000)' : 'Single filing (€1,000)'}
+            </button>
+          </div>
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <div className={`num text-3xl font-black ${textColor}`}>{fmtEUR(fsa.used)}</div>
@@ -65,12 +74,13 @@ export function TaxView({ data, exportName }: TaxViewProps) {
               <div className="num mt-1 text-base font-black text-slate-700 dark:text-slate-200">{fmtEUR(data.summary.tax)}</div>
             </div>
           </div>
-          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-5">
             {[
-              { label: 'Dividends',      value: fsa.breakdown.dividends },
-              { label: 'Interest',       value: fsa.breakdown.interest },
-              { label: 'Stock perks',    value: fsa.breakdown.stockperks },
-              { label: 'Realized gains', value: fsa.breakdown.realized_gains },
+              { label: 'Dividends',       value: fsa.breakdown.dividends },
+              { label: 'Interest',        value: fsa.breakdown.interest },
+              { label: 'Stock perks',     value: fsa.breakdown.stockperks },
+              { label: 'Vorabpauschale',  value: fsa.breakdown.vorabpauschale },
+              { label: 'Realized gains',  value: fsa.breakdown.realized_gains },
             ].map((item) => (
               <div key={item.label} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
                 <div className="text-xs font-extrabold uppercase tracking-wide text-slate-500">{item.label}</div>
@@ -80,7 +90,7 @@ export function TaxView({ data, exportName }: TaxViewProps) {
           </div>
         </Card>
       )}
-      <TableView title="Tax" subtitle="Vorabpauschale and withholding tax records" rows={data.tax} columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)']} />
+      <TableView title="Tax" subtitle="Vorabpauschale and withholding tax records" rows={data.tax} columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)', 'Description']} />
     </section>
   );
 }

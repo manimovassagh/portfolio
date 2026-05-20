@@ -46,6 +46,7 @@ class FsaBreakdown(BaseModel):
     interest: float | None
     stockperks: float | None
     realized_gains: float | None
+    vorabpauschale: float | None
 
 class FsaResponse(BaseModel):
     year: int

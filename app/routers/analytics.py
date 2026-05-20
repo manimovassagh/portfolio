@@ -32,7 +32,8 @@ _COUNTRY_NAMES: dict[str, str] = {
     "QS": "International",
 }
 
-_FSA_LIMIT = 1000.0
+_FSA_LIMIT_SINGLE = 1000.0
+_FSA_LIMIT_JOINT  = 2000.0
 
 
 @router.get("/api/analytics")
@@ -104,34 +105,36 @@ def get_geographic(export: str | None = None) -> GeographicResponse:
 
 
 @router.get("/api/fsa", response_model=FsaResponse)
-def get_fsa(export: str | None = None) -> FsaResponse:
+def get_fsa(export: str | None = None, joint: bool = False) -> FsaResponse:
     s = get_state(export)
     df, realized = s["df"], s["realized"]
 
     current_year = pd.Timestamp.now().year
     df_year = df[df["date"].dt.year == current_year]
 
-    dividends = float(df_year[df_year["type"] == "DIVIDEND"]["amount"].sum() or 0.0)
-    interest = float(
-        df_year[df_year["type"].isin(["INTEREST_PAYMENT"])]["amount"].sum() or 0.0
-    )
-    stockperks = float(df_year[df_year["type"] == "STOCKPERK"]["amount"].sum() or 0.0)
-    realized_gains = float(
-        sum(r.pnl for r in realized if pd.Timestamp(r.date).year == current_year and r.pnl > 0)
-    )
+    dividends      = float(df_year[df_year["type"] == "DIVIDEND"]["amount"].sum() or 0.0)
+    interest       = float(df_year[df_year["type"] == "INTEREST_PAYMENT"]["amount"].sum() or 0.0)
+    stockperks     = float(df_year[df_year["type"] == "STOCKPERK"]["amount"].sum() or 0.0)
+    vorabpauschale = float(df_year[df_year["type"] == "EARNINGS"]["amount"].sum() or 0.0)
+    # Net realized gains for the year: losses offset gains, floored at 0
+    realized_gains = max(0.0, sum(
+        r.pnl for r in realized if pd.Timestamp(r.date).year == current_year
+    ))
 
-    used = dividends + interest + stockperks + realized_gains
-    remaining = max(0.0, _FSA_LIMIT - used)
+    limit = _FSA_LIMIT_JOINT if joint else _FSA_LIMIT_SINGLE
+    used = dividends + interest + stockperks + vorabpauschale + realized_gains
+    remaining = max(0.0, limit - used)
 
     return FsaResponse(
         year=current_year,
-        limit=_FSA_LIMIT,
+        limit=limit,
         used=to_float(used),
         remaining=to_float(remaining),
         breakdown=FsaBreakdown(
             dividends=to_float(dividends),
             interest=to_float(interest),
             stockperks=to_float(stockperks),
+            vorabpauschale=to_float(vorabpauschale),
             realized_gains=to_float(realized_gains),
         ),
     )
