@@ -2,8 +2,7 @@ import { useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import {
-  ArrowUpRight, ChevronRight, EyeOff, LockKeyhole,
-  MoreHorizontal, Plus, Settings, Share2,
+  ArrowUpRight, ChevronRight,
 } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { InfoModal } from '../ui/InfoModal';
@@ -283,20 +282,16 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
             </div>
             <div className="flex items-center gap-2">
               <button className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-black text-black hover:bg-slate-100" onClick={() => navigate('holdings')}>
-                <Plus size={16} /> Add account
+                View holdings <ChevronRight size={16} />
               </button>
-              <button className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white"><Settings size={18} /></button>
-              <button className="rounded-md p-2 text-slate-400 hover:bg-white/8 hover:text-white"><Share2 size={18} /></button>
             </div>
           </div>
 
           <div className="px-5 py-4">
             <div className="flex flex-wrap items-center justify-between gap-3 text-sm font-bold text-slate-300">
               <div className="flex items-center gap-5">
-                <button className="inline-flex items-center gap-2 hover:text-white"><EyeOff size={17} /> Hide</button>
                 <button className="inline-flex items-center gap-2 hover:text-white" onClick={() => navigate('analytics')}><ArrowUpRight size={17} /> Performance</button>
               </div>
-              <button className="inline-flex items-center gap-2 text-slate-300 hover:text-white"><LockKeyhole size={18} /> Add benchmark</button>
             </div>
 
             <div className="mt-7 grid gap-4 xl:grid-cols-[280px_minmax(0,1fr)]">
@@ -420,7 +415,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
         <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
           <div className="flex flex-wrap items-center justify-between gap-4">
             <h2 className="text-lg font-black">Positions</h2>
-            <button onClick={() => navigate('holdings')} className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-black text-black hover:bg-slate-100"><Plus size={16} /> Add transaction</button>
+            <button onClick={() => navigate('holdings')} className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-black text-black hover:bg-slate-100">View holdings <ChevronRight size={16} /></button>
           </div>
           <div className="mt-6 flex gap-8 text-sm font-black text-slate-500">
             {positionRangeOptions.map((range) => (
@@ -441,7 +436,6 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
                   <th className="py-3 text-right">Buy in</th>
                   <th className="py-3 text-right">Position</th>
                   <th className="py-3 text-right">P/L</th>
-                  <th className="w-8 py-3" />
                 </tr>
               </thead>
               <tbody>
@@ -468,7 +462,6 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
                       <div>{signedEUR(pnl)}</div>
                       <div className="text-xs">{pct(rangePct)}</div>
                     </td>
-                    <td className="py-4 text-right text-slate-500"><MoreHorizontal size={18} /></td>
                   </tr>
                 ))}
               </tbody>
