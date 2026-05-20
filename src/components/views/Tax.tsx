@@ -6,6 +6,7 @@ import { TableView } from '../TableView';
 import { fmtEUR } from '../../lib/format';
 import { fetchFsa } from '../../api';
 import type { DashboardData, ExportName, FsaData } from '../../types';
+import { AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface TaxViewProps {
   data: DashboardData;
@@ -20,14 +21,17 @@ export function TaxView({ data, exportName }: TaxViewProps) {
   }, [exportName]);
 
   const usedPct = fsa ? (fsa.used / fsa.limit) * 100 : 0;
-  const barColor  = usedPct > 80 ? 'bg-amber-500' : 'bg-emerald-500';
-  const textColor = usedPct > 80 ? 'text-amber-500' : 'text-emerald-500';
+  const isWithinAllowance = fsa ? fsa.used <= fsa.limit : true;
+  const taxableExcess = fsa ? Math.max(0, fsa.used - fsa.limit) : 0;
+  const barColor = isWithinAllowance ? 'bg-emerald-500' : 'bg-rose-500';
+  const textColor = isWithinAllowance ? 'text-emerald-500' : 'text-rose-500';
+  const StatusIcon = isWithinAllowance ? ShieldCheck : AlertTriangle;
 
   return (
     <section className="space-y-6">
       {fsa && (
         <Card className="p-5">
-          <PanelTitle title={`FSA tracker — ${fsa.year}`} subtitle="Annual savings allowance usage" />
+          <PanelTitle title={`FSA tracker — ${fsa.year}`} subtitle="Annual tax-free savings allowance usage" />
           <div className="mb-4 flex items-end justify-between gap-4">
             <div>
               <div className={`num text-3xl font-black ${textColor}`}>{fmtEUR(fsa.used)}</div>
@@ -36,6 +40,31 @@ export function TaxView({ data, exportName }: TaxViewProps) {
             <div className={`num text-2xl font-black ${textColor}`}>{usedPct.toFixed(1)}%</div>
           </div>
           <ProgressBar pct={usedPct} color={barColor} />
+          <div className={`mt-4 flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-sm font-extrabold ${
+            isWithinAllowance
+              ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+              : 'border-rose-500/20 bg-rose-500/10 text-rose-600 dark:text-rose-400'
+          }`}>
+            <div className="flex min-w-0 items-center gap-2">
+              <StatusIcon size={18} className="shrink-0" />
+              <span>{isWithinAllowance ? 'Safe: covered by the tax-free allowance' : 'Allowance exceeded'}</span>
+            </div>
+            <span className="num shrink-0">{isWithinAllowance ? `${fmtEUR(fsa.remaining)} buffer` : `${fmtEUR(taxableExcess)} excess`}</span>
+          </div>
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+              <div className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Allowance used</div>
+              <div className={`num mt-1 text-base font-black ${textColor}`}>{fmtEUR(fsa.used)}</div>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+              <div className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Taxable excess</div>
+              <div className={`num mt-1 text-base font-black ${taxableExcess > 0 ? 'text-rose-500' : 'text-emerald-500'}`}>{fmtEUR(taxableExcess)}</div>
+            </div>
+            <div className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800">
+              <div className="text-xs font-extrabold uppercase tracking-wide text-slate-500">Tax withheld in CSV</div>
+              <div className="num mt-1 text-base font-black text-slate-700 dark:text-slate-200">{fmtEUR(data.summary.tax)}</div>
+            </div>
+          </div>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {[
               { label: 'Dividends',      value: fsa.breakdown.dividends },

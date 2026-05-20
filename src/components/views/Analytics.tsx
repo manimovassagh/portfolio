@@ -19,6 +19,7 @@ export function AnalyticsView({ data, dark }: AnalyticsViewProps) {
   const sectors = data.analytics.sectors.filter((s) => s.value > 0);
   const years = Object.keys(data.analytics.monthly).sort();
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const donutLabels = { show: true, value: { formatter: (value: string) => fmtEUR(Number(value)) } };
   const [geo, setGeo] = useState<GeographicData | null>(null);
 
   useEffect(() => {
@@ -79,7 +80,7 @@ export function AnalyticsView({ data, dark }: AnalyticsViewProps) {
               ...t,
               labels: sectors.map((s) => s.label),
               colors: ['#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6', '#06b6d4'],
-              plotOptions: { pie: { donut: { size: '68%', labels: { show: true, total: { show: true, label: 'Total', formatter: () => fmtEUR(sectors.reduce((a, b) => a + b.value, 0)) } } } } },
+              plotOptions: { pie: { donut: { size: '68%', labels: { ...donutLabels, total: { show: true, label: 'Total', formatter: () => fmtEUR(sectors.reduce((a, b) => a + b.value, 0)) } } } } },
               dataLabels: { enabled: true, formatter: (v) => `${Number(v).toFixed(1)}%`, style: { fontSize: '12px', fontWeight: 800 } },
               legend: { position: 'bottom', labels: { colors: dark ? '#cbd5e1' : '#475569' } },
               tooltip: { y: { formatter: (v) => fmtEUR(v) } },
@@ -99,7 +100,7 @@ export function AnalyticsView({ data, dark }: AnalyticsViewProps) {
               ...t,
               labels: geo.countries.map((c) => c.name),
               colors: ['#10b981', '#0ea5e9', '#f59e0b', '#8b5cf6', '#06b6d4', '#f43f5e', '#84cc16', '#ec4899'],
-              plotOptions: { pie: { donut: { size: '68%', labels: { show: true, total: { show: true, label: 'Total', formatter: () => fmtEUR(geo.countries.reduce((a, b) => a + b.value, 0)) } } } } },
+              plotOptions: { pie: { donut: { size: '68%', labels: { ...donutLabels, total: { show: true, label: 'Total', formatter: () => fmtEUR(geo.countries.reduce((a, b) => a + b.value, 0)) } } } } },
               dataLabels: { enabled: true, formatter: (v) => `${Number(v).toFixed(1)}%`, style: { fontSize: '12px', fontWeight: 800 } },
               legend: { position: 'bottom', labels: { colors: dark ? '#cbd5e1' : '#475569' } },
               tooltip: { y: { formatter: (v) => fmtEUR(v) } },

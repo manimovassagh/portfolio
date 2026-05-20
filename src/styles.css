@@ -66,4 +66,26 @@
   .dark .pro-table tbody tr:hover {
     background: rgb(30 41 59 / 0.62);
   }
+
+  .apexcharts-tooltip.apexcharts-theme-dark,
+  .apexcharts-xaxistooltip.apexcharts-theme-dark {
+    border: 1px solid rgb(71 85 105 / 0.72) !important;
+    background: rgb(15 23 42 / 0.96) !important;
+    color: rgb(248 250 252) !important;
+    box-shadow: 0 18px 40px rgb(0 0 0 / 0.36) !important;
+  }
+
+  .apexcharts-tooltip.apexcharts-theme-dark .apexcharts-tooltip-title {
+    border-bottom-color: rgb(71 85 105 / 0.72) !important;
+    background: rgb(30 41 59 / 0.96) !important;
+    color: rgb(248 250 252) !important;
+  }
+
+  .apexcharts-tooltip.apexcharts-theme-dark * {
+    color: rgb(248 250 252) !important;
+  }
+
+  .apexcharts-tooltip-marker {
+    box-shadow: 0 0 0 1px rgb(15 23 42 / 0.88);
+  }
 }

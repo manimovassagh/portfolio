@@ -111,11 +111,11 @@ def get_fsa(export: str | None = None) -> FsaResponse:
     current_year = pd.Timestamp.now().year
     df_year = df[df["date"].dt.year == current_year]
 
-    dividends = float(df_year[df_year["type"] == "Dividend"]["amount"].sum() or 0.0)
+    dividends = float(df_year[df_year["type"] == "DIVIDEND"]["amount"].sum() or 0.0)
     interest = float(
-        df_year[df_year["type"].isin(["Interest", "Interest_payout"])]["amount"].sum() or 0.0
+        df_year[df_year["type"].isin(["INTEREST_PAYMENT"])]["amount"].sum() or 0.0
     )
-    stockperks = float(df_year[df_year["type"] == "Stock_perk"]["amount"].sum() or 0.0)
+    stockperks = float(df_year[df_year["type"] == "STOCKPERK"]["amount"].sum() or 0.0)
     realized_gains = float(
         sum(r.pnl for r in realized if pd.Timestamp(r.date).year == current_year and r.pnl > 0)
     )
