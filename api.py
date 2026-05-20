@@ -2,11 +2,12 @@
 """FastAPI entry point.
 
 Thin bootstrapper — all routes live in app/routers/.
-Run with:  uv run uvicorn api:app --reload --port 8765
+Run with:  make run
 """
 from __future__ import annotations
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.deps import BASE_DIR
@@ -21,3 +22,11 @@ app.include_router(core.router)
 app.include_router(portfolio.router)
 app.include_router(analytics.router)
 app.include_router(watchlist.router)
+
+
+@app.get("/{full_path:path}", response_class=FileResponse)
+def spa_fallback(full_path: str) -> FileResponse:
+    """Serve the React app for client-side routes such as /tax or /analytics."""
+    if full_path.startswith("api/"):
+        raise HTTPException(404, "Not found")
+    return FileResponse(BASE_DIR / "static" / "dist" / "index.html")

@@ -59,11 +59,17 @@ uv sync
 # Build the frontend
 npm run build
 
-# Start the server
-uv run uvicorn api:app --port 8765
+# Start the server with the bundled local TLS cert
+make run
 ```
 
-Open **http://127.0.0.1:8765** — the sample portfolio loads automatically.
+Open **https://127.0.0.1:8765/overview** — the sample portfolio loads automatically.
+
+For a one-off manual start, use:
+
+```bash
+uv run uvicorn api:app --host 0.0.0.0 --port 8765 --ssl-keyfile certs/key.pem --ssl-certfile certs/cert.pem
+```
 
 ---
 
