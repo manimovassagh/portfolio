@@ -11,6 +11,7 @@ For European ETFs we prefer XETRA (.DE) tickers as they're EUR-denominated.
 from __future__ import annotations
 
 import json
+import math
 import os
 import time
 from datetime import date
@@ -136,7 +137,16 @@ def fetch_prices(isins: list[str], force_refresh: bool = False) -> dict[str, flo
     if not force_refresh and cache.get("_date") == today and cache_is_fresh:
         cached_prices = cache.get("prices", {})
         if all(isin in cached_prices for isin in isins):
-            return {isin: float(cached_prices[isin]) for isin in isins}
+            result = {}
+            for isin in isins:
+                try:
+                    v = float(cached_prices[isin])
+                    if math.isfinite(v):
+                        result[isin] = v
+                except (TypeError, ValueError):
+                    pass
+            if len(result) == len(isins):
+                return result
 
     tickers_map = resolve_tickers(isins)
     prices: dict[str, float] = {}
@@ -145,10 +155,29 @@ def fetch_prices(isins: list[str], force_refresh: bool = False) -> dict[str, flo
     for isin, ticker in tickers_map.items():
         try:
             t = yf.Ticker(ticker)
+            raw: float | None = None
+
             hist = t.history(period="5d", auto_adjust=False)
-            if hist.empty:
+            if not hist.empty:
+                v = float(hist["Close"].iloc[-1])
+                if math.isfinite(v):
+                    raw = v
+
+            if raw is None:
+                fi = t.fast_info
+                for key in ("regularMarketPrice", "lastPrice"):
+                    try:
+                        v = fi.get(key)
+                        if v is not None:
+                            fv = float(v)
+                            if math.isfinite(fv):
+                                raw = fv
+                                break
+                    except Exception:
+                        pass
+
+            if raw is None:
                 continue
-            raw = float(hist["Close"].iloc[-1])
 
             # Determine currency. yfinance exposes it via `fast_info.currency`.
             try:
@@ -161,12 +190,25 @@ def fetch_prices(isins: list[str], force_refresh: bool = False) -> dict[str, flo
                     fx_cache[ccy] = _fetch_fx_rate(ccy, "EUR")
                 raw *= fx_cache[ccy]
 
-            prices[isin] = raw
+            if math.isfinite(raw):
+                prices[isin] = raw
         except Exception:
             continue
 
-    merged = {**cache.get("prices", {}), **prices}
+    clean_cached = {k: v for k, v in cache.get("prices", {}).items()
+                    if isinstance(v, (int, float)) and math.isfinite(v)}
+    merged = {**clean_cached, **prices}
     if prices:
         _save_json(PRICE_CACHE_FILE, {"_date": today, "_fetched_at": time.time(), "prices": merged})
 
-    return {isin: float(merged[isin]) for isin in isins if isin in merged}
+    result = {}
+    for isin in isins:
+        if isin not in merged:
+            continue
+        try:
+            v = float(merged[isin])
+            if math.isfinite(v):
+                result[isin] = v
+        except (TypeError, ValueError):
+            pass
+    return result
