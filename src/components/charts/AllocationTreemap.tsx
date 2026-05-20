@@ -55,7 +55,7 @@ export function AllocationTreemap({ data, dark, openAsset, compact = false }: Al
         return `<div style="padding:10px 14px;font-size:12px;font-family:Inter,sans-serif">
           <div style="font-weight:800;margin-bottom:6px">${h.name}</div>
           <div>Market value: <b>${fmtEUR(h.market_value)}</b></div>
-          <div>Weight: <b>${h.weight.toFixed(1)}%</b></div>
+          <div>Weight: <b>${(h.weight ?? 0).toFixed(1)}%</b></div>
           <div>P&amp;L: <b style="color:${color}">${signedEUR(h.unrealized_pnl)} (${pct(h.unrealized_pct)})</b></div>
         </div>`;
       },

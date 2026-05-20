@@ -34,7 +34,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
                     <div className="num text-xs text-slate-500">{h.isin}</div>
                   </td>
                   <td><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{h.asset_class}</span></td>
-                  <td className="num text-right">{h.shares.toFixed(4)}</td>
+                  <td className="num text-right">{(h.shares ?? 0).toFixed(4)}</td>
                   <td className="num text-right">{fmtEUR(h.avg_cost)}</td>
                   <td className="num text-right">{fmtEUR(h.current_price)}</td>
                   <td className="num text-right font-bold">{fmtEUR(h.market_value)}</td>
@@ -43,8 +43,8 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
                   <td className="num text-right text-slate-500">{h.ttm_yield !== null ? `${h.ttm_yield.toFixed(2)}%` : '—'}</td>
                   <td className="num text-right">
                     <span className="inline-flex items-center gap-1.5">
-                      {h.weight.toFixed(1)}%
-                      {h.weight > 20 && <span className="inline-block h-2 w-2 rounded-full bg-amber-500" title="Concentration warning: above 20% of portfolio" />}
+                      {(h.weight ?? 0).toFixed(1)}%
+                      {(h.weight ?? 0) > 20 && <span className="inline-block h-2 w-2 rounded-full bg-amber-500" title="Concentration warning: above 20% of portfolio" />}
                     </span>
                   </td>
                 </tr>

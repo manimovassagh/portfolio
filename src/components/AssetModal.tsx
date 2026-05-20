@@ -50,7 +50,7 @@ export function AssetModal({ asset, onClose }: AssetModalProps) {
         </div>
 
         <div className="grid grid-cols-2 gap-3 border-b border-slate-200 p-5 text-sm md:grid-cols-4 dark:border-slate-800">
-          <MiniStat label="Shares"  value={asset.current.shares.toFixed(4)} />
+          <MiniStat label="Shares"  value={(asset.current.shares ?? 0).toFixed(4)} />
           <MiniStat label="Avg cost" value={fmtEUR(asset.current.avg_cost)} />
           <MiniStat label="Current"  value={fmtEUR(asset.current.current_price)} />
           <MiniStat label="P&L"      value={signedEUR(asset.current.unrealized)} />
