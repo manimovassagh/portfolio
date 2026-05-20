@@ -6,6 +6,8 @@ Run with:  make run
 """
 from __future__ import annotations
 
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -16,7 +18,7 @@ from portfolio import db
 
 app = FastAPI(title="Trade Republic Portfolio")
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
-db.init(BASE_DIR / "portfolio.db")
+db.init(BASE_DIR / os.environ.get("WATCHLIST_DB", "portfolio.db"))
 
 app.include_router(core.router)
 app.include_router(portfolio.router)
@@ -29,4 +31,7 @@ def spa_fallback(full_path: str) -> FileResponse:
     """Serve the React app for client-side routes such as /tax or /analytics."""
     if full_path.startswith("api/"):
         raise HTTPException(404, "Not found")
-    return FileResponse(BASE_DIR / "static" / "dist" / "index.html")
+    return FileResponse(
+        BASE_DIR / "static" / "dist" / "index.html",
+        headers={"Cache-Control": "no-store"},
+    )

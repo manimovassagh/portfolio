@@ -349,6 +349,11 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
               </button>
             ))}
           </div>
+          {allocationTab === 'sectors' && (
+            <div className="mt-3 rounded-md bg-white/[0.04] px-3 py-2 text-xs font-semibold text-slate-500">
+              No sector metadata available — showing by asset class
+            </div>
+          )}
           <Chart
             type="donut"
             height={330}

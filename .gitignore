@@ -19,3 +19,4 @@ certs/
 .DS_Store
 cache/
 static/dist/
+portfolio.db
