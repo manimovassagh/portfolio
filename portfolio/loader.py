@@ -8,6 +8,7 @@ import pandas as pd
 EXPORTS_DIR = Path(__file__).resolve().parent.parent / "exports"
 
 NUMERIC_COLS = ["shares", "price", "amount", "fee", "tax", "fx_rate"]
+REQUIRED_COLS = {"type", "date", "amount", "symbol", "name"}
 
 
 def latest_export(exports_dir: Path = EXPORTS_DIR) -> Path | None:
@@ -24,6 +25,12 @@ def list_exports(exports_dir: Path = EXPORTS_DIR) -> list[Path]:
 def load(csv_path: Path) -> pd.DataFrame:
     """Read a Trade Republic export and normalize types."""
     df = pd.read_csv(csv_path, dtype=str).fillna("")
+
+    missing = REQUIRED_COLS - set(df.columns)
+    if missing:
+        raise ValueError(
+            f"Not a valid Trade Republic export — missing columns: {', '.join(sorted(missing))}"
+        )
 
     for col in NUMERIC_COLS:
         if col in df.columns:

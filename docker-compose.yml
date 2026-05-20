@@ -5,6 +5,8 @@ services:
     volumes:
       - ./exports:/app/exports      # drop your CSV exports here
       - kapital-db:/app/db          # persists watchlist SQLite across restarts
+    environment:
+      WATCHLIST_DB: db/portfolio.db
 
   nginx:
     build: ./nginx
@@ -14,6 +16,9 @@ services:
       - "443:443"                   # HTTPS
     volumes:
       - ./certs:/etc/nginx/ssl:ro   # mkcert trusted certs (run setup-certs.sh first)
+    environment:
+      AUTH_USER: ""                 # set to enable HTTP Basic Auth (e.g. "admin")
+      AUTH_PASS: ""                 # password for AUTH_USER
     depends_on:
       - app
 

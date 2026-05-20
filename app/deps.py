@@ -52,7 +52,10 @@ def get_state(export_name: str | None = None, force_refresh: bool = False) -> di
         if not force_refresh and cached and time.time() - cached.get("loaded_at", 0) < ttl_seconds:
             return _cache[key]
 
-    df = loader.load(chosen)
+    try:
+        df = loader.load(chosen)
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     holdings, realized = positions.compute_holdings(df)
     isins = list(holdings.keys())
     live = prices.fetch_prices(isins, force_refresh=force_refresh)
