@@ -235,6 +235,9 @@ export default function App() {
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const dropTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const openDrop  = (label: string) => { if (dropTimerRef.current) clearTimeout(dropTimerRef.current); setOpenGroup(label); };
+  const closeDrop = () => { dropTimerRef.current = setTimeout(() => setOpenGroup(null), 120); };
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -307,12 +310,13 @@ export default function App() {
                 }
 
                 return (
-                  <div key={group.label} className="relative" onMouseEnter={() => setOpenGroup(group.label)} onMouseLeave={() => setOpenGroup(null)}>
+                  <div key={group.label} className="relative" onMouseEnter={() => openDrop(group.label)} onMouseLeave={closeDrop}>
                     <button className={isGroupActive ? activeClass : inactiveClass}>
                       <GroupIcon size={16} />{group.label}<ChevronDown size={12} className="opacity-50" />
                     </button>
                     {openGroup === group.label && (
-                      <div className="absolute left-0 top-full z-50 mt-1 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]">
+                      <div className="absolute left-0 top-full z-50 w-48 pt-1.5">
+                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]">
                         {group.items.map((sectionId) => {
                           const sec = sections.find((s) => s.id === sectionId)!;
                           const SecIcon = sec.icon;
@@ -327,6 +331,7 @@ export default function App() {
                             </NavLink>
                           );
                         })}
+                      </div>
                       </div>
                     )}
                   </div>

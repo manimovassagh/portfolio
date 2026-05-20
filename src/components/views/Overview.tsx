@@ -191,7 +191,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
       formatter: (label: string, opts) => {
         const holding = allocationHoldings[opts.dataPointIndex];
         if (!holding) return label;
-        return `${label}\n${holding.weight.toFixed(1)}%`;
+        return `${label}\n${(holding.weight ?? 0).toFixed(1)}%`;
       },
     },
     stroke: { width: 2, colors: ['#202020'] },
@@ -206,7 +206,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
         return `<div style="padding:10px 12px;font-size:12px;font-family:Inter,sans-serif">
           <div style="max-width:240px;font-weight:800;margin-bottom:6px">${safeName}</div>
           <div>Market value: <b>${fmtEUR(holding.market_value)}</b></div>
-          <div>Weight: <b>${holding.weight.toFixed(1)}%</b></div>
+          <div>Weight: <b>${(holding.weight ?? 0).toFixed(1)}%</b></div>
           <div>P/L: <b style="color:${color}">${signedEUR(holding.unrealized_pnl)} (${pct(holding.unrealized_pct)})</b></div>
         </div>`;
       },
@@ -462,7 +462,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
                     </td>
                     <td className="num py-4 text-right">
                       <div className="font-bold text-slate-200">{fmtEUR(item.market_value)}</div>
-                      <div className="text-xs text-slate-500">{item.shares.toFixed(4)} shares</div>
+                      <div className="text-xs text-slate-500">{(item.shares ?? 0).toFixed(4)} shares</div>
                     </td>
                     <td className={`num py-4 text-right font-black ${(pnl || 0) >= 0 ? 'text-[#6ee787]' : 'text-rose-400'}`}>
                       <div>{signedEUR(pnl)}</div>
@@ -510,7 +510,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
               <button key={item.isin} onClick={() => openAsset(item)} className="flex w-full items-center justify-between gap-3 rounded-lg p-2 text-left hover:bg-white/[0.06]">
                 <div className="min-w-0">
                   <div className="truncate text-sm font-bold text-slate-100">{item.name}</div>
-                  <div className="num text-xs text-slate-500">{item.weight.toFixed(1)}% weight</div>
+                  <div className="num text-xs text-slate-500">{(item.weight ?? 0).toFixed(1)}% weight</div>
                 </div>
                 <div className="text-right">
                   <div className={`num text-sm font-black ${(item.unrealized_pnl || 0) >= 0 ? 'text-[#6ee787]' : 'text-rose-400'}`}>{signedEUR(item.unrealized_pnl)}</div>

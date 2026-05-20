@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Chart from 'react-apexcharts';
-import { ExternalLink, Newspaper, Search, TrendingDown, TrendingUp } from 'lucide-react';
+import { ExternalLink, Newspaper, Search, Star, TrendingDown, TrendingUp } from 'lucide-react';
 import { Card } from '../ui/Card';
-import { marketHistory, marketNews, marketQuote, marketSearch } from '../../api';
-import type { MarketCandle, MarketNewsItem, MarketQuote, MarketSearchResult } from '../../types';
+import { addWatchlistItem, fetchWatchlist, marketHistory, marketNews, marketQuote, marketSearch, removeWatchlistItem } from '../../api';
+import type { MarketCandle, MarketNewsItem, MarketQuote, MarketSearchResult, WatchlistData } from '../../types';
 
 type Range = '1D' | '1W' | '1M' | '6M' | '1Y' | '5Y' | 'Max';
 const RANGES: Range[] = ['1D', '1W', '1M', '6M', '1Y', '5Y', 'Max'];
@@ -84,6 +84,9 @@ export function MarketsView() {
   const [loadingChart, setLoadingChart]   = useState(false);
   const [loadingNews, setLoadingNews]     = useState(false);
   const [error, setError]         = useState<string | null>(null);
+  const [watchlist, setWatchlist] = useState<WatchlistData | null>(null);
+  const [starring, setStarring]   = useState(false);
+  const [starToast, setStarToast] = useState<string | null>(null);
 
   const searchRef   = useRef<HTMLDivElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -92,10 +95,35 @@ export function MarketsView() {
   const showQuickPicks = inputFocused && results.length === 0;
   const dropdownVisible = showDrop || showQuickPicks;
 
+  const isStarred = !!selected && (watchlist?.items.some((i) => i.ticker === selected.ticker) ?? false);
+
+  const toggleStar = async () => {
+    if (!selected || starring) return;
+    setStarring(true);
+    try {
+      let updated: WatchlistData;
+      if (isStarred) {
+        const existing = watchlist!.items.find((i) => i.ticker === selected.ticker)!;
+        updated = await removeWatchlistItem(existing.isin);
+        setStarToast(`Removed ${selected.ticker} from watchlist`);
+      } else {
+        updated = await addWatchlistItem({ isin: selected.ticker, ticker: selected.ticker, name: selected.name, notes: '', target_price: null });
+        setStarToast(`Added ${selected.ticker} to watchlist`);
+      }
+      setWatchlist(updated);
+    } catch {
+      setStarToast('Failed to update watchlist');
+    } finally {
+      setStarring(false);
+      setTimeout(() => setStarToast(null), 2500);
+    }
+  };
+
   useEffect(() => {
     loadQuoteAndChart(DEFAULT.ticker, '1M');
     setLoadingNews(true);
     marketNews(DEFAULT.ticker).then(setNews).catch(() => setNews([])).finally(() => setLoadingNews(false));
+    fetchWatchlist().then(setWatchlist).catch(() => {});
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -255,6 +283,12 @@ export function MarketsView() {
         <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-500">{error}</div>
       )}
 
+      {starToast && (
+        <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-slate-900 px-4 py-3 text-sm font-bold text-white shadow-lg dark:bg-slate-100 dark:text-slate-900">
+          {starToast}
+        </div>
+      )}
+
       {selected && (
         <>
           {/* Quote panel */}
@@ -265,7 +299,17 @@ export function MarketsView() {
               <div className="flex flex-wrap items-start justify-between gap-4">
                 <div>
                   <div className="text-xs font-extrabold uppercase tracking-widest text-slate-400">{selected.exchange} · {selected.type}</div>
-                  <div className="mt-1 text-2xl font-black text-slate-900 dark:text-white">{selected.name}</div>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span className="text-2xl font-black text-slate-900 dark:text-white">{selected.name}</span>
+                    <button
+                      onClick={toggleStar}
+                      disabled={starring}
+                      title={isStarred ? 'Remove from watchlist' : 'Add to watchlist'}
+                      className={`rounded-md p-1 transition ${isStarred ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400 dark:text-slate-600 dark:hover:text-amber-400'}`}
+                    >
+                      <Star size={18} fill={isStarred ? 'currentColor' : 'none'} />
+                    </button>
+                  </div>
                   <div className="num text-xs text-slate-400">{selected.ticker}</div>
                 </div>
                 <div className="text-right">
