@@ -43,6 +43,27 @@ function assetIsinFromPath(pathname: string): string | null {
   return match?.[1] ? decodeURIComponent(match[1]) : null;
 }
 
+function marketStatus(now: Date) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Berlin',
+    weekday: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(now);
+  const value = (type: string) => parts.find((part) => part.type === type)?.value || '';
+  const weekday = value('weekday');
+  const minutes = Number(value('hour')) * 60 + Number(value('minute'));
+  const tradingDay = !['Sat', 'Sun'].includes(weekday);
+  const euOpen = tradingDay && minutes >= 9 * 60 && minutes < 17 * 60 + 30;
+  const usOpen = tradingDay && minutes >= 15 * 60 + 30 && minutes < 22 * 60;
+
+  if (euOpen && usOpen) return { label: 'EU + US markets open', open: true };
+  if (euOpen) return { label: 'EU market open', open: true };
+  if (usOpen) return { label: 'US market open', open: true };
+  return { label: 'Markets closed · crypto live', open: false };
+}
+
 export default function App() {
   const [dark, setDark]             = useState(() => localStorage.getItem('theme') !== 'light');
   const routerNavigate              = useNavigate();
@@ -197,6 +218,7 @@ export default function App() {
   const holderName   = data?.summary.holder_name;
   const initials     = holderName?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
+  const market = marketStatus(lastUpdated || new Date());
   const routeContent = useMemo(() => {
     if (!data) return null;
     return (
@@ -281,8 +303,15 @@ export default function App() {
                 <div className="text-sm font-semibold text-slate-500 dark:text-slate-500">Net worth / Investments / Trade Republic</div>
                 <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{currentLabel}</h1>
               </div>
-              <div className="text-right text-sm text-slate-500">
-                Last updated {(lastUpdated || new Date()).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              <div className="flex flex-col items-end gap-2 text-right text-sm text-slate-500">
+                <span className={`rounded-md border px-2.5 py-1 text-xs font-black uppercase tracking-wide ${
+                  market.open
+                    ? 'border-emerald-500/25 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400'
+                    : 'border-slate-300 bg-white text-slate-500 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-300'
+                }`}>
+                  {market.label}
+                </span>
+                <span>Last updated {(lastUpdated || new Date()).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>
             {error && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-500">{error}</div>}
