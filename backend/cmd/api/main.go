@@ -23,6 +23,7 @@ func main() {
 	pricerClient := pricer.New(cfg.PricerURL)
 	holdingsH := handler.NewHoldingsHandler(cfg, pricerClient)
 	portfolioH := handler.NewPortfolioHandler(cfg, pricerClient)
+	watchlistH := handler.NewWatchlistHandler(store)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -34,6 +35,9 @@ func main() {
 	api.GET("/holdings", holdingsH.List)
 	api.GET("/holdings/:isin", holdingsH.Detail)
 	api.GET("/portfolio", portfolioH.Overview)
+	api.GET("/watchlist", watchlistH.Get)
+	api.POST("/watchlist", watchlistH.Add)
+	api.DELETE("/watchlist/:isin", watchlistH.Remove)
 
 	log.Printf("Go backend on :%s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
