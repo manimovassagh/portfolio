@@ -17,7 +17,14 @@ var sellTypes = map[string]bool{
 
 // ComputeHoldings walks transactions and returns current positions using average-cost method.
 func ComputeHoldings(txs []model.Transaction) map[string]model.Holding {
+	holdings, _ := ComputeHoldingsAndRealized(txs)
+	return holdings
+}
+
+// ComputeHoldingsAndRealized returns both current positions and realized trades.
+func ComputeHoldingsAndRealized(txs []model.Transaction) (map[string]model.Holding, []model.RealizedEntry) {
 	holdings := map[string]model.Holding{}
+	var realized []model.RealizedEntry
 
 	for _, tx := range txs {
 		if strings.ToUpper(tx.Category) != "TRADING" {
@@ -39,19 +46,44 @@ func ComputeHoldings(txs []model.Transaction) map[string]model.Holding {
 		h.FeesPaid += fee
 
 		if buyTypes[typ] {
-			invested := math.Abs(tx.Amount) - fee
-			h.CostBasis += invested
+			// Cost basis includes the fee (matches Python: cost_basis += abs(amount))
+			h.CostBasis += math.Abs(tx.Amount)
 			h.Shares += shares
 		} else if sellTypes[typ] {
+			avgCost := 0.0
 			if h.Shares > 1e-9 {
-				ratio := shares / h.Shares
-				h.CostBasis -= h.CostBasis * ratio
+				avgCost = h.CostBasis / h.Shares
+				h.CostBasis -= avgCost * shares
+				if h.CostBasis < 0 {
+					h.CostBasis = 0
+				}
 			}
 			h.Shares -= shares
 			if h.Shares < 1e-9 {
 				h.Shares = 0
 				h.CostBasis = 0
 			}
+
+			pnl := (tx.Price - avgCost) * shares
+			pnlPct := 0.0
+			if avgCost > 0 {
+				pnlPct = (tx.Price - avgCost) / avgCost * 100
+			}
+			var date *string
+			if tx.Date != "" {
+				d := tx.Date
+				date = &d
+			}
+			realized = append(realized, model.RealizedEntry{
+				Date:      date,
+				Name:      tx.Name,
+				ISIN:      isin,
+				Shares:    shares,
+				SellPrice: tx.Price,
+				AvgCost:   avgCost,
+				PnL:       pnl,
+				PnLPct:    pnlPct,
+			})
 		}
 
 		if h.Shares > 1e-9 {
@@ -65,7 +97,7 @@ func ComputeHoldings(txs []model.Transaction) map[string]model.Holding {
 			delete(holdings, k)
 		}
 	}
-	return holdings
+	return holdings, realized
 }
 
 // EnrichWithPrices attaches live prices, market values, P&L and weights.
@@ -78,8 +110,8 @@ func EnrichWithPrices(holdings map[string]model.Holding, prices map[string]float
 	}
 
 	result := make([]model.Holding, 0, len(holdings))
-	for isin, h := range holdings {
-		if p, ok := prices[isin]; ok {
+	for _, h := range holdings {
+		if p, ok := prices[h.ISIN]; ok {
 			price := p
 			mv := p * h.Shares
 			pnl := mv - h.CostBasis
@@ -95,7 +127,6 @@ func EnrichWithPrices(holdings map[string]model.Holding, prices map[string]float
 				h.Weight = mv / totalMV * 100
 			}
 		}
-		_ = isin
 		result = append(result, h)
 	}
 

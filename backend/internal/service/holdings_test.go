@@ -20,11 +20,11 @@ func TestComputeHoldings_BuyOnly(t *testing.T) {
 	if h.Shares != 2.0 {
 		t.Errorf("expected shares 2.0, got %f", h.Shares)
 	}
-	if h.CostBasis != 199.0 {
-		t.Errorf("expected cost_basis 199.0 (amount minus fee), got %f", h.CostBasis)
+	if h.CostBasis != 200.0 {
+		t.Errorf("expected cost_basis 200.0 (abs(amount), matches Python), got %f", h.CostBasis)
 	}
-	if h.AvgCost != 99.5 {
-		t.Errorf("expected avg_cost 99.5, got %f", h.AvgCost)
+	if h.AvgCost != 100.0 {
+		t.Errorf("expected avg_cost 100.0, got %f", h.AvgCost)
 	}
 	if h.FeesPaid != 1.0 {
 		t.Errorf("expected fees 1.0, got %f", h.FeesPaid)

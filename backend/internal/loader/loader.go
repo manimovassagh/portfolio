@@ -11,6 +11,18 @@ import (
 	"github.com/manimovassagh/portfolio/internal/model"
 )
 
+// ResolveExport returns the path for a named export, or the latest if name is empty.
+func ResolveExport(dir, name string) (string, error) {
+	if name == "" {
+		return LatestExport(dir)
+	}
+	p := filepath.Join(dir, filepath.Base(name))
+	if _, err := os.Stat(p); os.IsNotExist(err) {
+		return "", fmt.Errorf("export %q not found", name)
+	}
+	return p, nil
+}
+
 // LatestExport returns the path to the most recently modified CSV in dir.
 func LatestExport(dir string) (string, error) {
 	entries, err := filepath.Glob(filepath.Join(dir, "*.csv"))

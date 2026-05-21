@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: '/static/dist/',
+  base: mode === 'production' ? '/static/dist/' : '/',
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://localhost:8766',
+        secure: false,
+        changeOrigin: true,
+      },
+    },
+  },
   build: {
     outDir: 'static/dist',
     emptyOutDir: true,
@@ -23,4 +32,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));

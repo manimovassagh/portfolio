@@ -1,57 +1,89 @@
-.PHONY: run dev stop certs frontend build-frontend start-backend start-backend-dev run-pricer run-go run-all docker docker-down docker-logs typecheck install clean cache exports help
+.PHONY: run down stop logs certs dev frontend build-frontend start-backend start-backend-dev run-pricer run-go run-all docker docker-down docker-logs typecheck install clean cache exports help
 
 .DEFAULT_GOAL := help
 
-NPM ?= npm
-UV ?= uv
-APP_MODULE ?= api:app
-HOST ?= 0.0.0.0
-PORT ?= 8765
-SSL_KEYFILE ?= certs/key.pem
+NPM          ?= npm
+UV           ?= uv
+APP_MODULE   ?= api:app
+HOST         ?= 0.0.0.0
+PORT         ?= 8765
+PRICER_PORT  ?= 8001
+GO_PORT      ?= 8766
+VITE_PORT    ?= 5173
+SSL_KEYFILE  ?= certs/key.pem
 SSL_CERTFILE ?= certs/cert.pem
 
 UVICORN_ARGS := $(APP_MODULE) --host $(HOST) --port $(PORT) --ssl-keyfile $(SSL_KEYFILE) --ssl-certfile $(SSL_CERTFILE)
 
-run: stop certs build-frontend start-backend
+# ── Orchestration ──────────────────────────────────────────────────────────────
 
-dev: stop certs build-frontend start-backend-dev
+run: certs
+	@$(MAKE) -s stop
+	@mkdir -p logs
+	@echo "Starting pricer     → http://localhost:$(PRICER_PORT)"
+	@$(UV) run uvicorn pricer.main:app --host 0.0.0.0 --port $(PRICER_PORT) \
+		> logs/pricer.log 2>&1 &
+	@echo "Starting Go backend → https://localhost:$(GO_PORT)"
+	@(cd backend && go run ./cmd/api) \
+		> logs/backend.log 2>&1 &
+	@echo "Starting Vite       → http://localhost:$(VITE_PORT)"
+	@$(NPM) run dev --silent \
+		> logs/vite.log 2>&1 &
+	@echo ""
+	@echo "All services running.  Tail logs with: make logs"
+	@echo "Stop everything with:  make stop"
 
-stop:
-	@pids="$$(lsof -tiTCP:$(PORT) -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')"; \
-	if [ -n "$$pids" ]; then \
-		echo "Stopping processes listening on port $(PORT): $$pids"; \
-		kill $$pids; \
-		for _ in 1 2 3 4 5; do \
-			sleep 0.2; \
-			remaining="$$(lsof -tiTCP:$(PORT) -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')"; \
-			[ -z "$$remaining" ] && break; \
-		done; \
-		remaining="$$(lsof -tiTCP:$(PORT) -sTCP:LISTEN 2>/dev/null | tr '\n' ' ')"; \
-		if [ -n "$$remaining" ]; then \
-			echo "Port $(PORT) is still in use: $$remaining"; \
-			exit 1; \
-		fi; \
-	else \
-		echo "No process listening on port $(PORT)."; \
-	fi
+down stop:
+	@echo "Stopping all services..."
+	@-kill $$(lsof -tiTCP:$(PRICER_PORT) -sTCP:LISTEN 2>/dev/null) 2>/dev/null; true
+	@-kill $$(lsof -tiTCP:$(GO_PORT)     -sTCP:LISTEN 2>/dev/null) 2>/dev/null; true
+	@-kill $$(lsof -tiTCP:$(VITE_PORT)   -sTCP:LISTEN 2>/dev/null) 2>/dev/null; true
+	@echo "Done."
+
+logs:
+	@tail -f logs/pricer.log logs/backend.log logs/vite.log 2>/dev/null \
+		|| echo "No logs found — run 'make run' first."
+
+# ── TLS certificates ───────────────────────────────────────────────────────────
 
 certs:
 	@if [ ! -f "$(SSL_CERTFILE)" ] || [ ! -f "$(SSL_KEYFILE)" ]; then \
-		echo "Generating local self-signed TLS certificate in certs/"; \
+		echo "Generating self-signed TLS certificate in certs/"; \
 		mkdir -p certs; \
 		openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
 			-keyout "$(SSL_KEYFILE)" \
-			-out "$(SSL_CERTFILE)" \
+			-out    "$(SSL_CERTFILE)" \
 			-subj "/CN=localhost" \
-			-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"; \
+			-addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
+			2>/dev/null; \
+		echo "Certificate created: $(SSL_CERTFILE)"; \
 	else \
-		echo "Using existing TLS certificate: $(SSL_CERTFILE)"; \
+		echo "TLS certificate already exists: $(SSL_CERTFILE)"; \
 	fi
 
-frontend: build-frontend
+# ── Individual service targets ─────────────────────────────────────────────────
 
-build-frontend:
+run-pricer:
+	$(UV) run uvicorn pricer.main:app --host 0.0.0.0 --port $(PRICER_PORT)
+
+run-go:
+	cd backend && go run ./cmd/api
+
+# Blocking foreground mode (Ctrl-C kills all)
+run-all:
+	@trap 'kill 0' INT; \
+	$(MAKE) run-pricer & \
+	$(MAKE) run-go & \
+	$(NPM) run dev
+
+# ── Frontend ───────────────────────────────────────────────────────────────────
+
+frontend build-frontend:
 	$(NPM) run build
+
+# ── Legacy Python backend targets (uvicorn) ────────────────────────────────────
+
+dev: certs build-frontend start-backend-dev
 
 start-backend:
 	$(UV) run uvicorn $(UVICORN_ARGS)
@@ -59,17 +91,7 @@ start-backend:
 start-backend-dev:
 	$(UV) run uvicorn $(UVICORN_ARGS) --reload
 
-run-pricer:
-	$(UV) run uvicorn pricer.main:app --host 0.0.0.0 --port 8001
-
-run-go:
-	cd backend && go run ./cmd/api
-
-run-all:
-	@trap 'kill 0' INT; \
-	$(MAKE) run-pricer & \
-	$(MAKE) run-go & \
-	npm run dev
+# ── Docker ─────────────────────────────────────────────────────────────────────
 
 docker: certs
 	docker compose up --build
@@ -80,6 +102,8 @@ docker-down:
 docker-logs:
 	docker compose logs -f
 
+# ── Utilities ──────────────────────────────────────────────────────────────────
+
 typecheck:
 	$(NPM) run typecheck
 
@@ -88,38 +112,43 @@ install:
 	$(NPM) install
 
 clean:
-	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
+	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
 	find . -name "*.pyc" -delete 2>/dev/null; \
 	echo "Cleaned."
 
 cache:
-	rm -rf cache/
-	echo "Price cache cleared."
+	@rm -rf cache/
+	@echo "Price cache cleared."
 
 exports:
 	@ls -lh exports/ 2>/dev/null || echo "No exports/ directory found."
 
+# ── Help ───────────────────────────────────────────────────────────────────────
+
 help:
+	@echo ""
 	@echo "Usage: make <target>"
 	@echo ""
-	@echo "  run                Stop PORT, build frontend, start backend"
-	@echo "  dev                Stop PORT, build frontend, start backend with reload"
-	@echo "  stop               Stop processes listening on PORT (default: 8765)"
-	@echo "  certs              Generate local self-signed HTTPS certs if missing"
-	@echo "  docker             Generate certs and run Docker Compose"
-	@echo "  docker-down        Stop Docker Compose"
-	@echo "  docker-logs        Follow Docker Compose logs"
-	@echo "  frontend           Alias for build-frontend"
-	@echo "  build-frontend     Build React/Vite frontend"
-	@echo "  start-backend      Start FastAPI backend only"
-	@echo "  start-backend-dev  Start FastAPI backend only with reload"
-	@echo "  run-pricer         Start pricer microservice on port 8001"
-	@echo "  run-go             Start Go backend on port 8766"
-	@echo "  run-all            Start pricer + Go backend + Vite dev server"
-	@echo "  typecheck          Type-check TypeScript frontend"
-	@echo "  install            Install backend and frontend dependencies"
-	@echo "  clean              Remove __pycache__ and .pyc files"
-	@echo "  cache              Clear yfinance price cache"
-	@echo "  exports            List CSV export files"
+	@echo "  run          Start pricer + Go backend + Vite dev server (background)"
+	@echo "  stop         Stop all services  (alias: make down)"
+	@echo "  down         Stop all services  (alias: make stop)"
+	@echo "  logs         Tail live logs from all three services"
 	@echo ""
-	@echo "Overrides: PORT=8765 HOST=0.0.0.0 APP_MODULE=api:app"
+	@echo "  certs        Generate self-signed HTTPS certs if missing"
+	@echo "  run-pricer   Start pricer only (foreground)"
+	@echo "  run-go       Start Go backend only (foreground)"
+	@echo "  run-all      Start all three in foreground (Ctrl-C stops all)"
+	@echo ""
+	@echo "  build-frontend  Build React/Vite for production"
+	@echo "  typecheck    TypeScript type-check"
+	@echo "  install      Install backend and frontend dependencies"
+	@echo "  clean        Remove __pycache__ and .pyc files"
+	@echo "  cache        Clear yfinance price cache"
+	@echo "  exports      List CSV export files"
+	@echo ""
+	@echo "  docker       Build and start Docker Compose stack"
+	@echo "  docker-down  Stop Docker Compose stack"
+	@echo "  docker-logs  Follow Docker Compose logs"
+	@echo ""
+	@echo "Overrides: GO_PORT=8766 PRICER_PORT=8001 VITE_PORT=5173"
+	@echo ""

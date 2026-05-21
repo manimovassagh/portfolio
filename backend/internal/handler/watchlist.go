@@ -39,7 +39,12 @@ func (h *WatchlistHandler) Add(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "added"})
+	items, err := h.store.GetWatchlist()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, model.Watchlist{Items: items})
 }
 
 func (h *WatchlistHandler) Remove(c *gin.Context) {
@@ -48,5 +53,10 @@ func (h *WatchlistHandler) Remove(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"status": "removed"})
+	items, err := h.store.GetWatchlist()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, model.Watchlist{Items: items})
 }

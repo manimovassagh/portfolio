@@ -20,3 +20,4 @@ certs/
 cache/
 static/dist/
 portfolio.db
+logs/
