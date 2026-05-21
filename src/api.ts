@@ -1,6 +1,8 @@
 import type {
   Analytics,
   AssetDetail,
+  AuthProviders,
+  AuthSession,
   CashFlow,
   DashboardData,
   DividendCalendarData,
@@ -25,6 +27,8 @@ import type {
 import {
   AnalyticsSchema,
   AssetDetailSchema,
+  AuthProvidersSchema,
+  AuthSessionSchema,
   CashFlowSchema,
   DividendCalendarDataSchema,
   ExportsPayloadSchema,
@@ -45,9 +49,52 @@ import {
 } from './schemas';
 
 async function getJson<T>(url: string): Promise<T> {
-  const response = await fetch(url);
+  const response = await fetch(url, { credentials: 'same-origin' });
   if (!response.ok) throw new Error(`${url} failed with HTTP ${response.status}`);
   return response.json() as Promise<T>;
+}
+
+async function postJson<T>(url: string): Promise<T> {
+  const response = await fetch(url, { method: 'POST', credentials: 'same-origin' });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(detail?.error || `${url} failed with HTTP ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function getAuthSession(): Promise<AuthSession> {
+  const raw = await getJson<unknown>('/api/auth/session');
+  return AuthSessionSchema.parse(raw) as AuthSession;
+}
+
+export async function getAuthProviders(): Promise<AuthProviders> {
+  const raw = await getJson<unknown>('/api/auth/providers');
+  return AuthProvidersSchema.parse(raw) as AuthProviders;
+}
+
+export async function loginWithGoogle(): Promise<AuthSession> {
+  const raw = await postJson<unknown>('/api/auth/google');
+  return AuthSessionSchema.parse(raw) as AuthSession;
+}
+
+export async function loginWithApple(): Promise<AuthSession> {
+  const raw = await postJson<unknown>('/api/auth/apple');
+  return AuthSessionSchema.parse(raw) as AuthSession;
+}
+
+export async function loginWithPasskey(): Promise<AuthSession> {
+  const raw = await postJson<unknown>('/api/auth/passkey/begin');
+  return AuthSessionSchema.parse(raw) as AuthSession;
+}
+
+export async function loginInDevMode(): Promise<AuthSession> {
+  const raw = await postJson<unknown>('/api/auth/dev');
+  return AuthSessionSchema.parse(raw) as AuthSession;
+}
+
+export async function logout(): Promise<void> {
+  await postJson<unknown>('/api/auth/logout');
 }
 
 export async function listExports(): Promise<ExportName[]> {
@@ -100,7 +147,7 @@ export async function loadDashboard(exportName: ExportName): Promise<DashboardDa
 }
 
 export async function refreshPrices(exportName: ExportName): Promise<void> {
-  const response = await fetch(`/api/refresh_prices?export=${encodeURIComponent(exportName)}`, { method: 'POST' });
+  const response = await fetch(`/api/refresh_prices?export=${encodeURIComponent(exportName)}`, { method: 'POST', credentials: 'same-origin' });
   if (!response.ok) throw new Error(`Price refresh failed with HTTP ${response.status}`);
 }
 
@@ -148,6 +195,7 @@ export async function fetchWatchlist(): Promise<WatchlistData> {
 export async function addWatchlistItem(item: Omit<WatchlistItem, 'added_date' | 'current_price'>): Promise<WatchlistData> {
   const response = await fetch('/api/watchlist', {
     method: 'POST',
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(item),
   });
@@ -156,7 +204,7 @@ export async function addWatchlistItem(item: Omit<WatchlistItem, 'added_date' | 
 }
 
 export async function removeWatchlistItem(isin: string): Promise<WatchlistData> {
-  const response = await fetch(`/api/watchlist/${encodeURIComponent(isin)}`, { method: 'DELETE' });
+  const response = await fetch(`/api/watchlist/${encodeURIComponent(isin)}`, { method: 'DELETE', credentials: 'same-origin' });
   if (!response.ok) throw new Error(`Remove watchlist item failed with HTTP ${response.status}`);
   return response.json() as Promise<WatchlistData>;
 }
@@ -169,7 +217,7 @@ export async function fetchDividendCalendar(exportName: ExportName): Promise<Div
 export async function uploadExport(file: File): Promise<{ filename: string; exports: ExportName[] }> {
   const body = new FormData();
   body.append('file', file);
-  const response = await fetch('/api/upload', { method: 'POST', body });
+  const response = await fetch('/api/upload', { method: 'POST', body, credentials: 'same-origin' });
   if (!response.ok) throw new Error(`Upload failed with HTTP ${response.status}`);
   return response.json() as Promise<{ filename: string; exports: ExportName[] }>;
 }
