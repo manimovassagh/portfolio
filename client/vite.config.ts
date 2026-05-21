@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => ({
   plugins: [react()],
-  base: mode === 'production' ? '/static/dist/' : '/',
+  base: '/',
   server: {
     proxy: {
       '/api': {
@@ -21,7 +21,7 @@ export default defineConfig(({ mode }) => ({
     css: false,
   },
   build: {
-    outDir: 'static/dist',
+    outDir: 'dist',
     emptyOutDir: true,
     sourcemap: true,
     chunkSizeWarningLimit: 700,

@@ -19,5 +19,8 @@ certs/
 .DS_Store
 cache/
 static/dist/
+client/dist/
+client/playwright-report/
+client/test-results/
 portfolio.db
 logs/

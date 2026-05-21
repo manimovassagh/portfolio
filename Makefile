@@ -27,7 +27,7 @@ run: certs
 	@(cd backend && go run ./cmd/api) \
 		> logs/backend.log 2>&1 &
 	@echo "Starting Vite       → http://localhost:$(VITE_PORT)"
-	@$(NPM) run dev --silent \
+	@(cd client && $(NPM) run dev --silent) \
 		> logs/vite.log 2>&1 &
 	@echo ""
 	@echo "All services running.  Tail logs with: make logs"
@@ -74,12 +74,12 @@ run-all:
 	@trap 'kill 0' INT; \
 	$(MAKE) run-pricer & \
 	$(MAKE) run-go & \
-	$(NPM) run dev
+	cd client && $(NPM) run dev
 
 # ── Frontend ───────────────────────────────────────────────────────────────────
 
 frontend build-frontend:
-	$(NPM) run build
+	cd client && $(NPM) run build
 
 # ── Legacy Python backend targets (uvicorn) ────────────────────────────────────
 
@@ -105,11 +105,11 @@ docker-logs:
 # ── Utilities ──────────────────────────────────────────────────────────────────
 
 typecheck:
-	$(NPM) run typecheck
+	cd client && $(NPM) run typecheck
 
 install:
 	$(UV) sync
-	$(NPM) install
+	cd client && $(NPM) install
 
 clean:
 	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
