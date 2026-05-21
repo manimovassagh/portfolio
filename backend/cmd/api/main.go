@@ -26,7 +26,7 @@ func main() {
 	holdingsH := handler.NewHoldingsHandler(cfg, pricerClient)
 	portfolioH := handler.NewPortfolioHandler(cfg, pricerClient)
 	watchlistH := handler.NewWatchlistHandler(store)
-	coreH := handler.NewCoreHandler(cfg)
+	coreH := handler.NewCoreHandler(cfg, store, pricerClient)
 	authH := handler.NewAuthHandler(cfg, store)
 	cashFlowH := handler.NewCashFlowHandler(cfg)
 	incomeH := handler.NewIncomeHandler(cfg)
@@ -46,6 +46,7 @@ func main() {
 
 	// Core
 	api.GET("/health", coreH.Health)
+	api.GET("/readyz", coreH.Readyz)
 
 	// Auth
 	api.GET("/auth/session", authH.Session)

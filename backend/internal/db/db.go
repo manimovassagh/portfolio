@@ -32,6 +32,8 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() { s.db.Close() }
 
+func (s *Store) Ping() error { return s.db.Ping() }
+
 func (s *Store) migrate() error {
 	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS watchlist (
 		isin         TEXT PRIMARY KEY,

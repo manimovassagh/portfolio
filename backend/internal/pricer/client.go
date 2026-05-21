@@ -21,6 +21,19 @@ func New(baseURL string) *Client {
 	}
 }
 
+// Health probes the pricer's /health endpoint.
+func (c *Client) Health() error {
+	resp, err := c.httpClient.Get(c.baseURL + "/health")
+	if err != nil {
+		return fmt.Errorf("pricer unreachable: %w", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("pricer returned %d", resp.StatusCode)
+	}
+	return nil
+}
+
 // GetPrices fetches live prices for the given ISINs from the Python pricer.
 // Returns nil and an error if the pricer is unreachable.
 func (c *Client) GetPrices(isins []string) (map[string]float64, error) {
