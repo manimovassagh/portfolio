@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 
@@ -86,9 +87,71 @@ func (h *MiscHandler) Performance(c *gin.Context) {
 	})
 }
 
-// Geographic returns a stub empty countries list.
+// Geographic returns portfolio value grouped by issuing country from ISIN prefix.
 func (h *MiscHandler) Geographic(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{"countries": []gin.H{}})
+	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"countries": []gin.H{}})
+		return
+	}
+	txs, err := loader.Load(csvPath)
+	if err != nil {
+		c.JSON(http.StatusOK, gin.H{"countries": []gin.H{}})
+		return
+	}
+	holdings := service.ComputeHoldings(txs)
+	isins := make([]string, 0, len(holdings))
+	for isin := range holdings {
+		isins = append(isins, isin)
+	}
+	prices, _ := h.pricer.GetPrices(isins)
+	enriched := service.EnrichWithPrices(holdings, prices)
+
+	byCountry := map[string]float64{}
+	for _, h := range enriched {
+		if len(h.ISIN) < 2 {
+			continue
+		}
+		code := strings.ToUpper(h.ISIN[:2])
+		mv := 0.0
+		if h.MarketValue != nil {
+			mv = *h.MarketValue
+		}
+		byCountry[code] += mv
+	}
+
+	countries := make([]gin.H, 0, len(byCountry))
+	for code, val := range byCountry {
+		countries = append(countries, gin.H{
+			"code":  code,
+			"name":  isoCountryName(code),
+			"value": math.Round(val*100) / 100,
+		})
+	}
+	sort.Slice(countries, func(i, j int) bool {
+		return countries[i]["value"].(float64) > countries[j]["value"].(float64)
+	})
+	c.JSON(http.StatusOK, gin.H{"countries": countries})
+}
+
+// isoCountryName maps ISO 3166-1 alpha-2 codes to English country names.
+// Covers the most common issuing countries for European retail ETFs and stocks.
+func isoCountryName(code string) string {
+	names := map[string]string{
+		"IE": "Ireland", "DE": "Germany", "FR": "France", "GB": "United Kingdom",
+		"NL": "Netherlands", "LU": "Luxembourg", "US": "United States",
+		"CH": "Switzerland", "SE": "Sweden", "DK": "Denmark", "NO": "Norway",
+		"FI": "Finland", "IT": "Italy", "ES": "Spain", "AT": "Austria",
+		"BE": "Belgium", "PT": "Portugal", "PL": "Poland", "CZ": "Czech Republic",
+		"HU": "Hungary", "JP": "Japan", "CN": "China", "HK": "Hong Kong",
+		"SG": "Singapore", "AU": "Australia", "CA": "Canada", "BR": "Brazil",
+		"IN": "India", "KR": "South Korea", "TW": "Taiwan", "ZA": "South Africa",
+		"MX": "Mexico", "RU": "Russia", "SA": "Saudi Arabia", "AE": "UAE",
+	}
+	if n, ok := names[code]; ok {
+		return n
+	}
+	return code
 }
 
 // FSA computes the German Freistellungsauftrag (tax-free allowance) usage.
