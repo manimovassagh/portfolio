@@ -57,6 +57,14 @@ func (s *Store) migrate() error {
 		user_id    TEXT NOT NULL,
 		expires_at TEXT NOT NULL,
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+	CREATE TABLE IF NOT EXISTS passkey_credentials (
+		id         TEXT PRIMARY KEY,
+		user_id    TEXT NOT NULL,
+		public_key BLOB NOT NULL,
+		sign_count INTEGER NOT NULL DEFAULT 0,
+		aaguid     TEXT NOT NULL DEFAULT '',
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	)`)
 	return err
 }
@@ -175,4 +183,65 @@ func newSessionToken() (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
+}
+
+// SavePasskeyCredential stores a new passkey credential for a user.
+func (s *Store) SavePasskeyCredential(userID, credID string, publicKey []byte, signCount uint32, aaguid string) error {
+	_, err := s.db.Exec(
+		`INSERT OR REPLACE INTO passkey_credentials (id, user_id, public_key, sign_count, aaguid)
+		 VALUES (?, ?, ?, ?, ?)`,
+		credID, userID, publicKey, signCount, aaguid)
+	return err
+}
+
+// UpdatePasskeySignCount updates the signature counter for a credential.
+func (s *Store) UpdatePasskeySignCount(credID string, signCount uint32) error {
+	_, err := s.db.Exec(
+		`UPDATE passkey_credentials SET sign_count = ? WHERE id = ?`,
+		signCount, credID)
+	return err
+}
+
+// GetPasskeyCredentials returns all stored passkey credentials for a user.
+func (s *Store) GetPasskeyCredentials(userID string) ([]PasskeyCredRow, error) {
+	rows, err := s.db.Query(
+		`SELECT id, public_key, sign_count, aaguid FROM passkey_credentials WHERE user_id = ?`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []PasskeyCredRow
+	for rows.Next() {
+		var c PasskeyCredRow
+		if err := rows.Scan(&c.ID, &c.PublicKey, &c.SignCount, &c.AAGUID); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+// GetUserByPasskeyCredID looks up the user and credential row for a given credential ID.
+func (s *Store) GetUserByPasskeyCredID(credID string) (model.User, PasskeyCredRow, error) {
+	var user model.User
+	var cred PasskeyCredRow
+	err := s.db.QueryRow(
+		`SELECT u.id, u.provider, u.provider_subject, u.email, u.name, u.created_at,
+		        c.id, c.public_key, c.sign_count, c.aaguid
+		 FROM passkey_credentials c
+		 JOIN users u ON u.id = c.user_id
+		 WHERE c.id = ?`, credID,
+	).Scan(
+		&user.ID, &user.Provider, &user.ProviderSubject, &user.Email, &user.Name, &user.CreatedAt,
+		&cred.ID, &cred.PublicKey, &cred.SignCount, &cred.AAGUID,
+	)
+	return user, cred, err
+}
+
+// PasskeyCredRow is a raw credential row from the DB.
+type PasskeyCredRow struct {
+	ID        string
+	PublicKey []byte
+	SignCount uint32
+	AAGUID    string
 }
