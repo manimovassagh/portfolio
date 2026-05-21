@@ -1,5 +1,7 @@
 # Kapital
 
+![CI](https://github.com/manimovassagh/portfolio/actions/workflows/ci.yml/badge.svg)
+
 > Self-hosted portfolio analytics for Trade Republic — live prices, allocation, performance, tax, and FIRE projections in one dark-mode dashboard.
 
 The repo ships with `exports/sample-portfolio.csv` so you can run immediately without any private data.
