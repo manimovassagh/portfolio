@@ -11,7 +11,7 @@ import (
 func CORS() gin.HandlerFunc {
 	rawOrigins := os.Getenv("CORS_ORIGINS")
 	if rawOrigins == "" {
-		rawOrigins = "http://localhost:5173,https://localhost:5173,http://localhost"
+		rawOrigins = "http://localhost:5173,https://localhost:5173,http://localhost,http://localhost:8081"
 	}
 	allowed := map[string]bool{}
 	for _, o := range strings.Split(rawOrigins, ",") {

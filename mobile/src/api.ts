@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Change this to your backend URL when running on a physical device.
 // For iOS simulator / Android emulator talking to localhost, use the LAN IP.
-export const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'http://localhost:8766';
+export const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'https://localhost:8766';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -49,7 +49,7 @@ export type WatchlistItem = {
   current_price: number | null;
 };
 
-export type MarketSearchResult = { symbol: string; name: string; exchange: string; type: string };
+export type MarketSearchResult = { ticker: string; name: string; exchange: string; type: string };
 export type MarketQuote = {
   ticker: string;
   price: number;

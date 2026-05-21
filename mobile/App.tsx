@@ -66,8 +66,15 @@ export default function App() {
 
   useEffect(() => {
     getAuthSession()
-      .then((s) => { if (s.authenticated || !s.required) setSession(s); })
-      .catch(() => {})
+      .then((s) => {
+        // If auth is not required or already authenticated, go straight to main tabs.
+        // If auth IS required and not authenticated, show login.
+        if (!s.required || s.authenticated) setSession(s);
+      })
+      .catch(() => {
+        // Network error or CORS — treat as no-auth-required so app is still usable.
+        setSession({ authenticated: false, required: false, user: null });
+      })
       .finally(() => setLoading(false));
   }, []);
 

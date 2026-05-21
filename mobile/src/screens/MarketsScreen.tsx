@@ -33,9 +33,9 @@ function QuoteCard({ quote }: { quote: MarketQuote }) {
 type ResultRowProps = { item: MarketSearchResult; onSelect: (symbol: string) => void };
 function ResultRow({ item, onSelect }: ResultRowProps) {
   return (
-    <TouchableOpacity style={styles.resultRow} onPress={() => onSelect(item.symbol)}>
+    <TouchableOpacity style={styles.resultRow} onPress={() => onSelect(item.ticker)}>
       <View style={styles.resultLeft}>
-        <Text style={styles.resultSymbol}>{item.symbol}</Text>
+        <Text style={styles.resultSymbol}>{item.ticker}</Text>
         <Text style={styles.resultName} numberOfLines={1}>{item.name}</Text>
       </View>
       <Text style={styles.resultMeta}>{item.exchange}</Text>
@@ -104,7 +104,7 @@ export function MarketsScreen() {
         <FlatList
           style={styles.results}
           data={results}
-          keyExtractor={(i) => i.symbol}
+          keyExtractor={(i) => i.ticker}
           renderItem={({ item }) => <ResultRow item={item} onSelect={handleSelect} />}
           keyboardShouldPersistTaps="handled"
         />
