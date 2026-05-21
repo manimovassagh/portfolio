@@ -489,6 +489,12 @@ export default function App() {
                     <Icon size={17} />{label}
                   </NavLink>
                 ))}
+                <div className="mt-1 border-t border-black/10 pt-2 dark:border-white/10">
+                  <label className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
+                    <Upload size={17} /> Import CSV
+                    <input type="file" accept=".csv" className="hidden" onChange={(e) => { setMobileMenuOpen(false); void handleUpload(e.target.files?.[0]); }} />
+                  </label>
+                </div>
               </nav>
             </div>
           </>
@@ -511,7 +517,18 @@ export default function App() {
                 <span>Last updated {(lastUpdated || new Date()).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>
-            {error && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-500">{error}</div>}
+            {error && (
+              <div className="flex items-start gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-500">
+                <span className="flex-1">{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  className="shrink-0 rounded p-0.5 hover:bg-rose-500/10"
+                  aria-label="Dismiss error"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             {toast && <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-lg">{toast}</div>}
             {data && loading && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400">Refreshing dashboard data...</div>}
             {!data && loading && <SkeletonDashboard />}

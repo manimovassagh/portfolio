@@ -21,8 +21,8 @@ export function IncomeView({ data }: IncomeViewProps) {
         <PanelHeader title="Income" subtitle={`Total ${fmtEUR(total)}`} />
         {data.income.length === 0 ? (
           <Card className="p-8 text-center">
-            <h3 className="text-base font-black text-slate-900 dark:text-white">No income yet</h3>
-            <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-slate-500">Dividend, interest, and stock perk transactions will appear here once they exist in the selected export.</p>
+            <h3 className="text-base font-black text-slate-900 dark:text-white">No dividend income yet</h3>
+            <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-slate-500">Income appears once dividend transactions are in your export.</p>
           </Card>
         ) : (
           <div className="space-y-2">
@@ -49,10 +49,11 @@ export function IncomeView({ data }: IncomeViewProps) {
           subtitle={`Total ${fmtEUR(total)}`}
           rows={data.income}
           columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)']}
-          emptyTitle="No income yet"
-          emptyMessage="Dividend, interest, and stock perk transactions will appear here once they exist in the selected export."
+          emptyTitle="No dividend income yet"
+          emptyMessage="Income appears once dividend transactions are in your export."
         />
       </div>
+
 
       {calendar && calendar.upcoming.length > 0 && (
         <Card className="p-5">

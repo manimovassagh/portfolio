@@ -91,8 +91,8 @@ export function TaxView({ data, exportName }: TaxViewProps) {
         subtitle="Vorabpauschale and withholding tax records"
         rows={data.tax}
         columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)', 'Description']}
-        emptyTitle="No tax records yet"
-        emptyMessage="Withholding tax and Vorabpauschale entries will appear here once they exist in the selected export."
+        emptyTitle="No tax data yet"
+        emptyMessage="Withholding tax from your export appears here."
       />
     </section>
   );
