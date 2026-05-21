@@ -6,15 +6,21 @@ from __future__ import annotations
 
 import logging
 import math
+import re
 from collections import defaultdict
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 import yfinance as yf
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
-from pathlib import Path
 from pydantic import BaseModel
+
+_ISIN_RE = re.compile(r"^[A-Z]{2}[A-Z0-9]{10}$")
+_MAX_ISINS = 100
+_MAX_TRANSACTIONS = 10_000
+_MAX_HISTORY_YEARS = 15
 
 from .hist_cache import download_cached
 from .prices import fetch_prices, resolve_tickers
@@ -23,9 +29,18 @@ logger = logging.getLogger(__name__)
 app = FastAPI(title="pricer", docs_url=None, redoc_url=None)
 
 
+def _validate_isins(isin_list: list[str]) -> None:
+    if len(isin_list) > _MAX_ISINS:
+        raise HTTPException(status_code=400, detail=f"too many ISINs: max {_MAX_ISINS}, got {len(isin_list)}")
+    bad = [i for i in isin_list if not _ISIN_RE.match(i)]
+    if bad:
+        raise HTTPException(status_code=400, detail=f"invalid ISIN format: {bad[:5]}")
+
+
 @app.get("/prices")
 def get_prices(isins: str = Query(..., description="Comma-separated ISIN list")) -> dict[str, float]:
-    isin_list = [i.strip() for i in isins.split(",") if i.strip()]
+    isin_list = [i.strip().upper() for i in isins.split(",") if i.strip()]
+    _validate_isins(isin_list)
     try:
         return fetch_prices(isin_list)
     except Exception as exc:
@@ -312,8 +327,28 @@ def _compute_portfolio_series(
     return pv_series[first:], cb_series[first:]
 
 
+def _validate_analytics_request(req: PortfolioAnalyticsRequest) -> None:
+    if len(req.transactions) > _MAX_TRANSACTIONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"too many transactions: max {_MAX_TRANSACTIONS}, got {len(req.transactions)}",
+        )
+    if req.transactions:
+        dates = [t.date for t in req.transactions if t.date]
+        if dates:
+            import datetime
+            min_date = min(dates)
+            cutoff = (datetime.date.today() - datetime.timedelta(days=_MAX_HISTORY_YEARS * 365)).isoformat()
+            if min_date < cutoff:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"date range exceeds {_MAX_HISTORY_YEARS} years: earliest transaction {min_date}",
+                )
+
+
 @app.post("/portfolio_analytics")
 def portfolio_analytics(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
+    _validate_analytics_request(req)
     result = _compute_portfolio_series(req.transactions)
     if result is None:
         return _empty_analytics()
@@ -391,6 +426,7 @@ def portfolio_analytics(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
 
 @app.post("/portfolio_performance")
 def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
+    _validate_analytics_request(req)
     """Build the daily portfolio time series for the hero chart on the overview page.
 
     TWR is computed as:  daily_return = Σ(shares_start_of_day × Δprice) / pv_start_of_day

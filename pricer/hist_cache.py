@@ -8,6 +8,7 @@ from __future__ import annotations
 import hashlib
 import logging
 import os
+import tempfile
 import time
 from pathlib import Path
 
@@ -59,10 +60,19 @@ def download_cached(
 
     if df is not None and not df.empty:
         _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        tmp: str | None = None
         try:
-            df.to_parquet(path)
+            fd, tmp = tempfile.mkstemp(dir=_CACHE_DIR, suffix=".parquet.tmp")
+            os.close(fd)
+            df.to_parquet(tmp)
+            os.replace(tmp, path)  # atomic on POSIX
         except Exception as exc:
             logger.warning("could not write cache %s: %s", path.name, exc)
+            if tmp is not None:
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
 
     return df if df is not None else pd.DataFrame()
 
