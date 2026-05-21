@@ -1,11 +1,12 @@
-import { useState, type FormEvent } from 'react';
-import { Star, X } from 'lucide-react';
+import { useState, useCallback, type FormEvent } from 'react';
+import { Star, X, Bell } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { PanelHeader, PanelTitle } from '../ui/PanelTitle';
 import { fmtEUR } from '../../lib/format';
 import { addWatchlistItem, removeWatchlistItem } from '../../api';
 import { useWatchlistQuery } from '../../lib/queries';
+import { useWatchlistAlerts, type PriceAlert } from '../../lib/useWatchlistAlerts';
 import type { ExportName } from '../../types';
 
 type WatchlistForm = { isin: string; ticker: string; name: string; notes: string; target_price: string };
@@ -19,6 +20,22 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
   const [form, setForm]         = useState<WatchlistForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [alerts, setAlerts] = useState<PriceAlert[]>([]);
+
+  const handleAlerts = useCallback((newAlerts: PriceAlert[]) => {
+    setAlerts((prev) => [...prev, ...newAlerts]);
+    // Browser notification (best-effort — requires user permission).
+    if ('Notification' in window && Notification.permission === 'granted') {
+      for (const a of newAlerts) {
+        new Notification(`Target hit: ${a.name}`, {
+          body: `Current ${fmtEUR(a.current_price)} ≤ target ${fmtEUR(a.target_price)}`,
+          icon: '/favicon.ico',
+        });
+      }
+    }
+  }, []);
+
+  useWatchlistAlerts(watchlist?.items ?? [], handleAlerts);
 
   const reload = () => { void queryClient.invalidateQueries({ queryKey: ['watchlist'] }); };
 
@@ -67,11 +84,40 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
 
   return (
     <section className="space-y-4">
+      {/* Alert toasts — stacked at bottom-right, dismiss individually */}
+      {alerts.length > 0 && (
+        <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-2">
+          {alerts.map((a, idx) => (
+            <div key={`${a.isin}-${idx}`} className="flex items-start gap-3 rounded-xl bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-xl">
+              <Bell size={16} className="mt-0.5 shrink-0" />
+              <div>
+                <div>{a.name} hit target!</div>
+                <div className="font-normal opacity-90">{fmtEUR(a.current_price)} ≤ {fmtEUR(a.target_price)}</div>
+              </div>
+              <button onClick={() => setAlerts((prev) => prev.filter((_, i) => i !== idx))} className="ml-1 opacity-75 hover:opacity-100" aria-label="Dismiss alert">
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       <div className="flex items-start justify-between">
         <PanelHeader title="Watchlist" subtitle="Stocks and funds you are monitoring" />
-        <button onClick={() => setFormOpen((v) => !v)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
-          <Star size={16} /> Add item
-        </button>
+        <div className="flex gap-2">
+          {'Notification' in window && Notification.permission === 'default' && (
+            <button
+              onClick={() => { void Notification.requestPermission(); }}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700"
+              title="Enable browser notifications for target alerts"
+            >
+              <Bell size={16} /> Alerts
+            </button>
+          )}
+          <button onClick={() => setFormOpen((v) => !v)} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <Star size={16} /> Add item
+          </button>
+        </div>
       </div>
 
       {formOpen && (
