@@ -1,41 +1,31 @@
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { Star, X } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Card } from '../ui/Card';
 import { PanelHeader, PanelTitle } from '../ui/PanelTitle';
 import { fmtEUR } from '../../lib/format';
-import { addWatchlistItem, fetchWatchlist, removeWatchlistItem } from '../../api';
-import type { ExportName, WatchlistData } from '../../types';
+import { addWatchlistItem, removeWatchlistItem } from '../../api';
+import { useWatchlistQuery } from '../../lib/queries';
+import type { ExportName } from '../../types';
 
 type WatchlistForm = { isin: string; ticker: string; name: string; notes: string; target_price: string };
 
 const EMPTY_FORM: WatchlistForm = { isin: '', ticker: '', name: '', notes: '', target_price: '' };
 
 export function WatchlistView({ exportName: _exportName }: { exportName: ExportName }) {
-  const [watchlist, setWatchlist] = useState<WatchlistData | null>(null);
-  const [loading, setLoading]   = useState(true);
+  const queryClient = useQueryClient();
+  const { data: watchlist, isLoading: loading, isError } = useWatchlistQuery();
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm]         = useState<WatchlistForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError]       = useState<string | null>(null);
+  const [mutationError, setMutationError] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      setWatchlist(await fetchWatchlist());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not load watchlist');
-      setWatchlist(null);
-    }
-    finally { setLoading(false); }
-  }, []);
-
-  useEffect(() => { load(); }, [load]);
+  const reload = () => { void queryClient.invalidateQueries({ queryKey: ['watchlist'] }); };
 
   const handleAdd = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
-    setError(null);
+    setMutationError(null);
     try {
       const data = await addWatchlistItem({
         isin: form.isin.trim(),
@@ -44,21 +34,22 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
         notes: form.notes.trim(),
         target_price: form.target_price ? Number(form.target_price) : null,
       });
-      setWatchlist(data);
+      queryClient.setQueryData(['watchlist'], data);
       setForm(EMPTY_FORM);
       setFormOpen(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not add watchlist item');
+      setMutationError(err instanceof Error ? err.message : 'Could not add watchlist item');
     }
     finally { setSubmitting(false); }
   };
 
   const handleDelete = async (isin: string) => {
-    setError(null);
+    setMutationError(null);
     try {
-      setWatchlist(await removeWatchlistItem(isin));
+      const data = await removeWatchlistItem(isin);
+      queryClient.setQueryData(['watchlist'], data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not remove watchlist item');
+      setMutationError(err instanceof Error ? err.message : 'Could not remove watchlist item');
     }
   };
 
@@ -69,6 +60,10 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
     { key: 'target_price', label: 'Target price (€)',  placeholder: '120.00',       required: false },
     { key: 'notes',        label: 'Notes',             placeholder: 'Why watching…', required: false },
   ] as const;
+
+  const showError = isError
+    ? 'Could not load watchlist'
+    : mutationError;
 
   return (
     <section className="space-y-4">
@@ -111,21 +106,21 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
 
       {loading && <div className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />}
 
-      {error && (
+      {showError && (
         <Card className="p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h3 className="text-base font-black text-rose-500">Watchlist unavailable</h3>
-              <p className="mt-1 text-sm font-semibold text-slate-500">{error}</p>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{showError}</p>
             </div>
-            <button onClick={load} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+            <button onClick={reload} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
               Retry
             </button>
           </div>
         </Card>
       )}
 
-      {!loading && !error && watchlist?.items.length === 0 && (
+      {!loading && !isError && watchlist?.items.length === 0 && (
         <Card className="p-8 text-center">
           <Star size={32} className="mx-auto text-slate-400" />
           <h3 className="mt-3 text-base font-black">Nothing on the watchlist</h3>
@@ -133,7 +128,7 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
         </Card>
       )}
 
-      {!error && watchlist && watchlist.items.length > 0 && (
+      {!isError && watchlist && watchlist.items.length > 0 && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="pro-table min-w-[900px]">

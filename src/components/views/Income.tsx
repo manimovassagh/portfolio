@@ -1,21 +1,16 @@
-import { useEffect, useState } from 'react';
 import { Card } from '../ui/Card';
 import { PanelTitle } from '../ui/PanelTitle';
 import { TableView } from '../TableView';
 import { fmtEUR } from '../../lib/format';
-import { fetchDividendCalendar } from '../../api';
-import type { DashboardData, DividendCalendarData } from '../../types';
+import { useDividendCalendarQuery } from '../../lib/queries';
+import type { DashboardData } from '../../types';
 
 interface IncomeViewProps {
   data: DashboardData;
 }
 
 export function IncomeView({ data }: IncomeViewProps) {
-  const [calendar, setCalendar] = useState<DividendCalendarData | null>(null);
-
-  useEffect(() => {
-    fetchDividendCalendar(data.summary.export).catch(() => null).then((d) => { if (d) setCalendar(d); });
-  }, [data.summary.export]);
+  const { data: calendar } = useDividendCalendarQuery(data.summary.export);
 
   const total = Object.values(data.incomeTotals).reduce((a, b) => a + b, 0);
 

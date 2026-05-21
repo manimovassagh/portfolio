@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import Chart from 'react-apexcharts';
 import { Activity, ArrowDownRight, ArrowUpRight, BarChart2 } from 'lucide-react';
 import { Card } from '../ui/Card';
@@ -6,8 +5,8 @@ import { MetricCard } from '../ui/MetricCard';
 import { PanelTitle } from '../ui/PanelTitle';
 import { chartTheme } from '../../lib/chart';
 import { fmtEUR, pct } from '../../lib/format';
-import { fetchGeographic } from '../../api';
-import type { DashboardData, GeographicData } from '../../types';
+import { useGeographicQuery } from '../../lib/queries';
+import type { DashboardData } from '../../types';
 
 interface AnalyticsViewProps {
   data: DashboardData;
@@ -20,11 +19,7 @@ export function AnalyticsView({ data, dark }: AnalyticsViewProps) {
   const years = Object.keys(data.analytics.monthly).sort();
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const donutLabels = { show: true, value: { formatter: (value: string) => fmtEUR(Number(value)) } };
-  const [geo, setGeo] = useState<GeographicData | null>(null);
-
-  useEffect(() => {
-    fetchGeographic(data.summary.export).catch(() => null).then((d) => { if (d) setGeo(d); });
-  }, [data.summary.export]);
+  const { data: geo } = useGeographicQuery(data.summary.export);
 
   return (
     <section className="space-y-6">

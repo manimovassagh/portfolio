@@ -1,6 +1,7 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Star, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useQueryClient } from '@tanstack/react-query';
 import { getAuthSession, listExports, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
@@ -77,6 +78,7 @@ function marketStatus(now: Date) {
 }
 
 export default function App() {
+  const queryClient                 = useQueryClient();
   const [dark, setDark]             = useState(() => localStorage.getItem('theme') !== 'light');
   const routerNavigate              = useNavigate();
   const location                    = useLocation();
@@ -174,8 +176,9 @@ export default function App() {
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Price refresh failed');
     }
+    await queryClient.invalidateQueries();
     await loadByName(name);
-  }, [clearExportParam, exportName, loadByName]);
+  }, [clearExportParam, exportName, loadByName, queryClient]);
 
   useEffect(() => {
     if (!liveRefresh || !exportName) return;
