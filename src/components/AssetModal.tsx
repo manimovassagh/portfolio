@@ -21,15 +21,19 @@ export function AssetModal({ asset, onClose }: AssetModalProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4 backdrop-blur-sm"
       onClick={onClose}
+      role="presentation"
     >
       <Card
         className="flex max-h-[86vh] w-full max-w-4xl flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="asset-modal-title"
       >
         <div className="flex items-start justify-between border-b border-slate-200 p-5 dark:border-slate-800">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-black">{asset.name}</h2>
+              <h2 id="asset-modal-title" className="text-lg font-black">{asset.name}</h2>
               <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-500 dark:bg-slate-800 dark:text-slate-400">
                 {asset.asset_class}
               </span>
@@ -43,7 +47,7 @@ export function AssetModal({ asset, onClose }: AssetModalProps) {
             >
               {detailed ? 'Simple' : 'Detailed'}
             </button>
-            <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800">
+            <button onClick={onClose} className="rounded-lg p-2 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close asset details">
               <X size={18} />
             </button>
           </div>

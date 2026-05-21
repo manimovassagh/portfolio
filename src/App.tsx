@@ -1,12 +1,13 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, Menu, Moon, RefreshCw, Star, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
+import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Star, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { listExports, loadAsset, loadDashboard, refreshPrices, uploadExport } from './api';
+import { getAuthSession, listExports, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
+import { AuthScreen } from './components/AuthScreen';
 import { SkeletonDashboard, EmptyState } from './components/ui/Skeleton';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import type { AssetDetail, ChartMode, DashboardData, ExportName, Holding, SectionId } from './types';
+import type { AssetDetail, AuthSession, ChartMode, DashboardData, ExportName, Holding, SectionId } from './types';
 
 const Overview = lazy(() => import('./components/views/Overview').then((m) => ({ default: m.Overview })));
 const AnalyticsView = lazy(() => import('./components/views/Analytics').then((m) => ({ default: m.AnalyticsView })));
@@ -99,6 +100,9 @@ export default function App() {
   const [chartMode, setChartMode]   = useState<ChartMode>('Value');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [liveRefresh, setLiveRefresh] = useState(true);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [authPromptOpen, setAuthPromptOpen] = useState(false);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -108,6 +112,17 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('activeTab', active);
   }, [active]);
+
+  useEffect(() => {
+    let mounted = true;
+    getAuthSession()
+      .then((session) => { if (mounted) setAuthSession(session); })
+      .catch(() => {
+        if (mounted) setAuthSession({ authenticated: false, required: true, user: null });
+      })
+      .finally(() => { if (mounted) setAuthLoading(false); });
+    return () => { mounted = false; };
+  }, []);
 
   useEffect(() => {
     if (location.pathname === '/') {
@@ -223,15 +238,36 @@ export default function App() {
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
-    const payload = await uploadExport(file);
-    setExports(payload.exports);
-    setExportName(payload.filename);
-    localStorage.setItem('selectedExport', payload.filename);
-    clearExportParam();
-    setToast(`Loaded ${payload.filename}`);
-    window.setTimeout(() => setToast(null), 2800);
-    await loadByName(payload.filename);
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = await uploadExport(file);
+      setExports(payload.exports);
+      setExportName(payload.filename);
+      localStorage.setItem('selectedExport', payload.filename);
+      clearExportParam();
+      setToast(`Loaded ${payload.filename}`);
+      window.setTimeout(() => setToast(null), 2800);
+      await loadByName(payload.filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  const handleLogout = async () => {
+    await logout().catch(() => {});
+    setAuthSession({ authenticated: false, required: true, user: null });
+  };
+
+  const acceptAuthSession = useCallback((session: AuthSession) => {
+    setAuthSession(session);
+    if (session.authenticated) {
+      setAuthPromptOpen(false);
+      setError(null);
+    }
+  }, []);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -254,7 +290,8 @@ export default function App() {
   useEffect(() => { setMobileMenuOpen(false); }, [active]);
 
   const holderName   = data?.summary.holder_name;
-  const initials     = holderName?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+  const accountName  = authSession?.user?.name || holderName;
+  const initials     = accountName?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
   const market = marketStatus(lastUpdated || new Date());
   const routeContent = useMemo(() => {
@@ -269,14 +306,18 @@ export default function App() {
           {active === 'income'    && <IncomeView data={data} />}
           {active === 'realized'  && <RealizedView data={data} />}
           {active === 'tax'       && <TaxView data={data} exportName={exportName} />}
-          {active === 'watchlist' && <WatchlistView exportName={exportName} />}
+          {active === 'watchlist' && (
+            authSession?.authenticated
+              ? <WatchlistView exportName={exportName} />
+              : <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+          )}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
           {active === 'markets'   && <MarketsView />}
         </Suspense>
       </ErrorBoundary>
     );
-  }, [active, chartMode, dark, data, exportName, navigate, openAsset]);
+  }, [acceptAuthSession, active, authSession?.authenticated, chartMode, dark, data, exportName, navigate, openAsset]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-black dark:text-slate-100">
@@ -310,13 +351,27 @@ export default function App() {
                 }
 
                 return (
-                  <div key={group.label} className="relative" onMouseEnter={() => openDrop(group.label)} onMouseLeave={closeDrop}>
-                    <button className={isGroupActive ? activeClass : inactiveClass}>
+                  <div
+                    key={group.label}
+                    className="relative"
+                    onMouseEnter={() => openDrop(group.label)}
+                    onMouseLeave={closeDrop}
+                    onFocus={() => openDrop(group.label)}
+                    onBlur={(event) => {
+                      if (!event.currentTarget.contains(event.relatedTarget)) setOpenGroup(null);
+                    }}
+                  >
+                    <button
+                      className={isGroupActive ? activeClass : inactiveClass}
+                      aria-haspopup="menu"
+                      aria-expanded={openGroup === group.label}
+                      onClick={() => setOpenGroup((current) => current === group.label ? null : group.label)}
+                    >
                       <GroupIcon size={16} />{group.label}<ChevronDown size={12} className="opacity-50" />
                     </button>
                     {openGroup === group.label && (
                       <div className="absolute left-0 top-full z-50 w-48 pt-1.5">
-                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]">
+                      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]" role="menu">
                         {group.items.map((sectionId) => {
                           const sec = sections.find((s) => s.id === sectionId)!;
                           const SecIcon = sec.icon;
@@ -325,6 +380,7 @@ export default function App() {
                               key={sectionId}
                               to={sectionHref(sectionId)}
                               onClick={() => setOpenGroup(null)}
+                              role="menuitem"
                               className={`flex items-center gap-3 px-4 py-2.5 text-sm font-semibold transition hover:bg-slate-50 dark:hover:bg-slate-800 ${active === sectionId ? 'text-[#45b9a8]' : 'text-slate-700 dark:text-slate-300'}`}
                             >
                               <SecIcon size={16} />{sec.label}
@@ -360,7 +416,15 @@ export default function App() {
                   {liveRefresh ? 'Live' : 'Paused'}
                 </button>
                 {exports.length > 1 && (
-                  <select value={exportName} onChange={(e) => refresh(e.target.value)} className="hidden h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm md:block dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-100" disabled={loading}>
+                  <select
+                    id="export-picker"
+                    name="export"
+                    aria-label="Selected export"
+                    value={exportName}
+                    onChange={(e) => refresh(e.target.value)}
+                    className="hidden h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm md:block dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-100"
+                    disabled={loading}
+                  >
                     {exports.map((item) => <option key={item}>{item}</option>)}
                   </select>
                 )}
@@ -371,12 +435,38 @@ export default function App() {
                 <button onClick={() => refresh()} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]">
                   <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
                 </button>
-                <button onClick={() => setDark((v) => !v)} className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-3 text-slate-700 shadow-sm hover:bg-slate-50 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]">
+                <button
+                  onClick={() => setDark((v) => !v)}
+                  className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-3 text-slate-700 shadow-sm hover:bg-slate-50 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
+                  aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+                  title={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+                >
                   {dark ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
-                <div className="hidden h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 md:flex dark:bg-[#333] dark:text-slate-300">
-                  {initials ? <span className="text-xs font-black">{initials}</span> : <User size={18} />}
-                </div>
+                {authLoading ? (
+                  <div className="hidden h-10 w-24 animate-pulse rounded-md bg-slate-200 md:block dark:bg-[#333]" />
+                ) : authSession?.authenticated ? (
+                  <div className="hidden items-center gap-2 md:flex">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#333] dark:text-slate-300" title={accountName || 'Account'}>
+                      {initials ? <span className="text-xs font-black">{initials}</span> : <User size={18} />}
+                    </div>
+                    <button
+                      onClick={handleLogout}
+                      className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-3 text-slate-700 shadow-sm hover:bg-slate-50 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
+                      aria-label="Sign out"
+                      title="Sign out"
+                    >
+                      <LogOut size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setAuthPromptOpen(true)}
+                    className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50 md:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
+                  >
+                    <User size={16} /> Sign in
+                  </button>
+                )}
               </div>
             </div>
         </header>
@@ -424,6 +514,13 @@ export default function App() {
         </main>
 
       {modal && <AssetModal asset={modal} onClose={closeAsset} />}
+      {authPromptOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm" onMouseDown={() => setAuthPromptOpen(false)}>
+          <div onMouseDown={(event) => event.stopPropagation()}>
+            <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

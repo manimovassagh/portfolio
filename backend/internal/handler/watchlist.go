@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,6 +33,18 @@ func (h *WatchlistHandler) Add(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	item.ISIN = strings.ToUpper(strings.TrimSpace(item.ISIN))
+	item.Ticker = strings.ToUpper(strings.TrimSpace(item.Ticker))
+	item.Name = strings.TrimSpace(item.Name)
+	item.Notes = strings.TrimSpace(item.Notes)
+	if item.ISIN == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "isin is required"})
+		return
+	}
+	if item.Name == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "name is required"})
+		return
+	}
 	if item.AddedDate == "" {
 		item.AddedDate = time.Now().Format("2006-01-02")
 	}
@@ -48,7 +61,11 @@ func (h *WatchlistHandler) Add(c *gin.Context) {
 }
 
 func (h *WatchlistHandler) Remove(c *gin.Context) {
-	isin := c.Param("isin")
+	isin := strings.ToUpper(strings.TrimSpace(c.Param("isin")))
+	if isin == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "isin is required"})
+		return
+	}
 	if err := h.store.RemoveWatchlistItem(isin); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

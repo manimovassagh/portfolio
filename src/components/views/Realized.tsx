@@ -9,6 +9,8 @@ export function RealizedView({ data }: { data: DashboardData }) {
       subtitle={`Total ${signedEUR(data.realizedTotal)}`}
       rows={data.realized}
       columns={['date', 'name', 'shares', 'sell_price', 'avg_cost', 'pnl', 'pnl_pct']}
+      emptyTitle="No realized trades yet"
+      emptyMessage="Closed positions and sell transactions will appear here once they exist in the selected export."
     />
   );
 }

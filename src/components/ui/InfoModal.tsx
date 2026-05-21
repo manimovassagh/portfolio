@@ -12,14 +12,18 @@ export function InfoModal({ title, onClose, children }: InfoModalProps) {
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onClose}
+      role="presentation"
     >
       <div
         className="w-full max-w-md rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-slate-700 dark:bg-slate-900"
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="info-modal-title"
       >
         <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4 dark:border-slate-700">
-          <h2 className="text-base font-black tracking-tight text-slate-900 dark:text-white">{title}</h2>
-          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800">
+          <h2 id="info-modal-title" className="text-base font-black tracking-tight text-slate-900 dark:text-white">{title}</h2>
+          <button onClick={onClose} className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800" aria-label="Close dialog">
             <X size={18} />
           </button>
         </div>

@@ -14,7 +14,7 @@ export function EmptyState() {
   return (
     <Card className="p-8 text-center">
       <h2 className="text-lg font-black">No CSV export found</h2>
-      <p className="mt-2 text-sm text-slate-500">Add a CSV file to exports/ or import one from the toolbar.</p>
+      <p className="mt-2 text-sm text-slate-500">Add a CSV file to exports/, or sign in and use Import from the header on desktop.</p>
     </Card>
   );
 }

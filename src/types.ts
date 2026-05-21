@@ -3,6 +3,28 @@ export type ExportName = string;
 export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance' | 'goals' | 'markets';
 export type ChartMode = 'Value' | 'TWR' | 'Drawdown';
 
+export type AuthUser = {
+  id: string;
+  provider: string;
+  email: string;
+  name: string;
+  created_at: string;
+};
+
+export type AuthSession = {
+  authenticated: boolean;
+  required: boolean;
+  user: AuthUser | null;
+};
+
+export type AuthProviders = {
+  providers: {
+    google: boolean;
+    apple: boolean;
+    passkey: boolean;
+  };
+};
+
 export type Summary = {
   export: string;
   portfolio_value: number;

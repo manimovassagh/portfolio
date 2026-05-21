@@ -1,5 +1,7 @@
 package model
 
+import "time"
+
 // Transaction is one row from the Trade Republic CSV export.
 type Transaction struct {
 	DateTime    string  `json:"datetime"`
@@ -49,11 +51,11 @@ type TxRow struct {
 
 // AssetDetail is the full detail for one position (used in modal).
 type AssetDetail struct {
-	ISIN         string   `json:"isin"`
-	Name         string   `json:"name"`
-	AssetClass   string   `json:"asset_class"`
-	Current      Holding  `json:"current"`
-	Transactions []TxRow  `json:"transactions"`
+	ISIN         string  `json:"isin"`
+	Name         string  `json:"name"`
+	AssetClass   string  `json:"asset_class"`
+	Current      Holding `json:"current"`
+	Transactions []TxRow `json:"transactions"`
 }
 
 // WatchlistItem is one row from the SQLite watchlist table.
@@ -179,4 +181,28 @@ type AssetDetailV2 struct {
 type SectorItem struct {
 	Label string  `json:"label"`
 	Value float64 `json:"value"`
+}
+
+// User is an authenticated account owner.
+type User struct {
+	ID              string `json:"id"`
+	Provider        string `json:"provider"`
+	ProviderSubject string `json:"-"`
+	Email           string `json:"email"`
+	Name            string `json:"name"`
+	CreatedAt       string `json:"created_at"`
+}
+
+// Session is one browser session bound to a user.
+type Session struct {
+	Token     string
+	UserID    string
+	ExpiresAt time.Time
+}
+
+// AuthSession is the public auth state returned to the frontend.
+type AuthSession struct {
+	Authenticated bool  `json:"authenticated"`
+	Required      bool  `json:"required"`
+	User          *User `json:"user"`
 }
