@@ -1,14 +1,11 @@
 [project]
-name = "kapital-dashboard"
+name = "kapital-pricer"
 version = "0.1.0"
-description = "FastAPI and React dashboard for portfolio CSV analytics"
+description = "yfinance price microservice for the portfolio dashboard"
 requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.136.1",
-    "pandas>=3.0.3",
-    "python-multipart>=0.0.29",
     "requests>=2.34.2",
-    "scipy>=1.17.1",
     "uvicorn>=0.47.0",
     "yfinance>=1.3.0",
 ]
