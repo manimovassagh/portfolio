@@ -129,33 +129,66 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
       )}
 
       {!isError && watchlist && watchlist.items.length > 0 && (
-        <Card className="overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="pro-table min-w-[900px]">
-              <thead><tr><th>Asset</th><th>Ticker</th><th>Current price</th><th>Target price</th><th>Notes</th><th>Added</th><th /></tr></thead>
-              <tbody>
-                {watchlist.items.map((item) => {
-                  const atTarget = item.target_price !== null && item.current_price !== null && item.current_price <= item.target_price;
-                  return (
-                    <tr key={item.isin}>
-                      <td><div className="font-bold">{item.name}</div><div className="num text-xs text-slate-500">{item.isin}</div></td>
-                      <td><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{item.ticker || '—'}</span></td>
-                      <td className="num text-right">{fmtEUR(item.current_price)}</td>
-                      <td className={`num text-right font-bold ${atTarget ? 'text-emerald-500' : 'text-slate-500'}`}>{item.target_price !== null ? fmtEUR(item.target_price) : '—'}</td>
-                      <td className="max-w-[200px] truncate text-sm text-slate-500">{item.notes || '—'}</td>
-                      <td className="text-slate-500">{item.added_date}</td>
-                      <td>
-                        <button onClick={() => handleDelete(item.isin)} className="rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-500" title="Remove">
-                          <X size={15} />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <>
+          {/* Mobile card view */}
+          <div className="sm:hidden space-y-2">
+            {watchlist.items.map((item) => {
+              const atTarget = item.target_price !== null && item.current_price !== null && item.current_price <= item.target_price;
+              return (
+                <div key={item.isin} className="rounded-lg border border-slate-200 bg-white p-4 dark:border-[#2b2b2b] dark:bg-[#1a1a1a]">
+                  <div className="flex justify-between items-start gap-2">
+                    <div className="min-w-0">
+                      <span className="font-semibold truncate block">{item.name}</span>
+                      {item.ticker && (
+                        <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{item.ticker}</span>
+                      )}
+                    </div>
+                    <button onClick={() => handleDelete(item.isin)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-500" title="Remove">
+                      <X size={15} />
+                    </button>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-y-1.5 text-sm">
+                    <div className="text-slate-500">Current price</div>
+                    <div className="num text-right">{fmtEUR(item.current_price)}</div>
+                    <div className="text-slate-500">Target price</div>
+                    <div className={`num text-right font-bold ${atTarget ? 'text-emerald-500' : 'text-slate-500'}`}>{item.target_price !== null ? fmtEUR(item.target_price) : '—'}</div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-        </Card>
+
+          {/* Desktop table view */}
+          <div className="hidden sm:block">
+            <Card className="overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="pro-table min-w-[900px]">
+                  <thead><tr><th>Asset</th><th>Ticker</th><th>Current price</th><th>Target price</th><th>Notes</th><th>Added</th><th /></tr></thead>
+                  <tbody>
+                    {watchlist.items.map((item) => {
+                      const atTarget = item.target_price !== null && item.current_price !== null && item.current_price <= item.target_price;
+                      return (
+                        <tr key={item.isin}>
+                          <td><div className="font-bold">{item.name}</div><div className="num text-xs text-slate-500">{item.isin}</div></td>
+                          <td><span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{item.ticker || '—'}</span></td>
+                          <td className="num text-right">{fmtEUR(item.current_price)}</td>
+                          <td className={`num text-right font-bold ${atTarget ? 'text-emerald-500' : 'text-slate-500'}`}>{item.target_price !== null ? fmtEUR(item.target_price) : '—'}</td>
+                          <td className="max-w-[200px] truncate text-sm text-slate-500">{item.notes || '—'}</td>
+                          <td className="text-slate-500">{item.added_date}</td>
+                          <td>
+                            <button onClick={() => handleDelete(item.isin)} className="rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-500" title="Remove">
+                              <X size={15} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          </div>
+        </>
       )}
     </section>
   );
