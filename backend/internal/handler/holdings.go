@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"encoding/csv"
+	"fmt"
 	"math"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
@@ -133,4 +136,45 @@ func (h *HoldingsHandler) Detail(c *gin.Context) {
 		Current:      enriched[0],
 		Transactions: rows,
 	})
+}
+
+func (h *HoldingsHandler) Export(c *gin.Context) {
+	holdings, err := h.loadAndEnrich(c.Query("export"))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	filename := fmt.Sprintf("holdings-%s.csv", time.Now().Format("2006-01-02"))
+	c.Header("Content-Type", "text/csv")
+	c.Header("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s\"", filename))
+
+	w := csv.NewWriter(c.Writer)
+	_ = w.Write([]string{
+		"ISIN", "Name", "Shares", "Avg Cost", "Current Price",
+		"Market Value", "Unrealized P&L", "P&L %", "Weight",
+	})
+
+	fmtF := func(v *float64) string {
+		if v == nil {
+			return ""
+		}
+		return fmt.Sprintf("%.2f", *v)
+	}
+
+	for _, h := range holdings {
+		_ = w.Write([]string{
+			h.ISIN,
+			h.Name,
+			fmt.Sprintf("%.2f", h.Shares),
+			fmt.Sprintf("%.2f", h.AvgCost),
+			fmtF(h.CurrentPrice),
+			fmtF(h.MarketValue),
+			fmtF(h.UnrealizedPnL),
+			fmtF(h.UnrealizedPct),
+			fmt.Sprintf("%.2f", h.Weight),
+		})
+	}
+
+	w.Flush()
 }

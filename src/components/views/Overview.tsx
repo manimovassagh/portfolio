@@ -358,15 +358,17 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
                     </button>
                   ))}
                 </div>
-                <HeroChart
-                  data={chartData}
-                  dark={true}
-                  mode={chartMode}
-                  height={300}
-                  showLegend={false}
-                  minimal
-                  benchmarkLabel={benchmarkOptions.find((o) => o.ticker === benchmarkTicker)?.label}
-                />
+                <div className="h-48 md:h-[300px]">
+                  <HeroChart
+                    data={chartData}
+                    dark={true}
+                    mode={chartMode}
+                    height={300}
+                    showLegend={false}
+                    minimal
+                    benchmarkLabel={benchmarkOptions.find((o) => o.ticker === benchmarkTicker)?.label}
+                  />
+                </div>
               </div>
             </div>
           </div>

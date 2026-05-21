@@ -1,0 +1,958 @@
+openapi: "3.0.3"
+info:
+  title: Kapital API
+  version: "1.0.0"
+  description: |
+    REST API for the Kapital portfolio tracker backend.
+    All endpoints are prefixed with `/api`.
+servers:
+  - url: https://localhost:8766
+    description: Local development (HTTPS)
+  - url: http://localhost:8766
+    description: Local development (HTTP)
+
+tags:
+  - name: core
+    description: Health and utility endpoints
+  - name: auth
+    description: Authentication (session, Google, Apple, Passkey, dev)
+  - name: portfolio
+    description: Portfolio overview and summary
+  - name: holdings
+    description: Individual holding detail and list
+  - name: financial
+    description: Cash flow, income, realized P&L and tax
+  - name: analytics
+    description: Portfolio analytics and performance metrics
+  - name: watchlist
+    description: Saved watchlist (requires session)
+  - name: market
+    description: Market data proxied from pricer service
+  - name: actions
+    description: Data ingestion and price refresh
+
+paths:
+
+  /api/health:
+    get:
+      tags: [core]
+      summary: Health check
+      responses:
+        "200":
+          description: Service is up
+          content:
+            application/json:
+              example:
+                status: "ok"
+
+  /api/exports:
+    get:
+      tags: [core]
+      summary: List available CSV export files
+      responses:
+        "200":
+          description: Array of export filenames
+          content:
+            application/json:
+              example:
+                exports: ["2024-export.csv", "2023-export.csv"]
+
+  /api/summary:
+    get:
+      tags: [portfolio]
+      summary: Compute high-level portfolio summary (values, P&L, XIRR)
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename (omit to use the latest)
+          schema:
+            type: string
+          example: "2024-export.csv"
+      responses:
+        "200":
+          description: Portfolio summary
+          content:
+            application/json:
+              example:
+                export: "2024-export.csv"
+                portfolio_value: 52340.12
+                market_value: 50000.00
+                cash_balance: 2340.12
+                cost_basis: 42000.00
+                net_deposits: 40000.00
+                deposits: 45000.00
+                withdrawals: 5000.00
+                unrealized_pnl: 8000.00
+                unrealized_pct: 19.05
+                realized_pnl: 1200.00
+                total_return: 0.308
+                xirr: 0.142
+                dividends: 800.00
+                interest: 50.00
+                stock_perks: 0.00
+                fees: 120.00
+                tax: 180.00
+                n_holdings: 12
+                n_realized: 4
+                holder_name: "Jane Doe"
+                first_trade_date: "2020-03-15"
+        "404":
+          description: Export file not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/portfolio:
+    get:
+      tags: [portfolio]
+      summary: Full portfolio overview with enriched holdings and summary metrics
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Portfolio overview object
+          content:
+            application/json:
+              example:
+                market_value: 50000.00
+                cost_basis: 42000.00
+                unrealized_pnl: 8000.00
+                holdings:
+                  - isin: "IE00B4L5Y983"
+                    name: "iShares MSCI World ETF"
+                    shares: 120.5
+                    avg_cost: 68.50
+                    cost_basis: 8254.25
+                    market_value: 9640.00
+                    unrealized_pnl: 1385.75
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              example:
+                error: "failed to load export"
+
+  /api/holdings:
+    get:
+      tags: [holdings]
+      summary: List all current holdings with live prices
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Holdings list with total market value
+          content:
+            application/json:
+              example:
+                total_market_value: 50000.00
+                holdings:
+                  - isin: "IE00B4L5Y983"
+                    name: "iShares MSCI World ETF"
+                    asset_class: "ETF"
+                    shares: 120.5
+                    avg_cost: 68.50
+                    cost_basis: 8254.25
+                    market_value: 9640.00
+                    unrealized_pnl: 1385.75
+                    unrealized_pct: 16.79
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              example:
+                error: "failed to load export"
+
+  /api/holdings/{isin}:
+    get:
+      tags: [holdings]
+      summary: Detail view for a single holding including transaction history
+      parameters:
+        - name: isin
+          in: path
+          required: true
+          description: ISIN of the security
+          schema:
+            type: string
+          example: "IE00B4L5Y983"
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Holding detail with transactions
+          content:
+            application/json:
+              example:
+                isin: "IE00B4L5Y983"
+                name: "iShares MSCI World ETF"
+                asset_class: "ETF"
+                current:
+                  shares: 120.5
+                  avg_cost: 68.50
+                  cost_basis: 8254.25
+                  market_value: 9640.00
+                  unrealized_pnl: 1385.75
+                transactions:
+                  - date: "2023-06-01"
+                    type: "BUY"
+                    shares: 10.0
+                    price: 70.50
+                    amount: -705.00
+                    fee: 1.50
+                    tax: null
+                    description: "Market buy"
+        "404":
+          description: Holding not found
+          content:
+            application/json:
+              example:
+                error: "not found"
+        "500":
+          description: Internal error
+          content:
+            application/json:
+              example:
+                error: "failed to load export"
+
+  /api/holdings/export:
+    get:
+      tags: [holdings]
+      summary: Export holdings as CSV (route alias — not a separate handler)
+      description: This path is documented for completeness; it resolves to the holdings list endpoint with an export query param.
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Same shape as GET /api/holdings
+
+  /api/asset/{isin}:
+    get:
+      tags: [holdings]
+      summary: Asset detail with full transaction history across all categories
+      parameters:
+        - name: isin
+          in: path
+          required: true
+          description: ISIN of the security
+          schema:
+            type: string
+          example: "IE00B4L5Y983"
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Asset detail (uses `unrealized` field name, not `unrealized_pnl`)
+          content:
+            application/json:
+              example:
+                isin: "IE00B4L5Y983"
+                name: "iShares MSCI World ETF"
+                asset_class: "ETF"
+                current:
+                  shares: 120.5
+                  avg_cost: 68.50
+                  cost_basis: 8254.25
+                  current_price: 80.00
+                  market_value: 9640.00
+                  unrealized: 1385.75
+                transactions:
+                  - date: "2023-06-01"
+                    type: "BUY"
+                    shares: 10.0
+                    price: 70.50
+                    amount: -705.00
+                    fee: 1.50
+                    tax: null
+                    description: "Market buy"
+        "404":
+          description: ISIN not found in export
+          content:
+            application/json:
+              example:
+                error: "no transactions for ISIN IE00B4L5Y983"
+
+  /api/position_returns:
+    get:
+      tags: [analytics]
+      summary: Position return stub (placeholder, returns empty map)
+      responses:
+        "200":
+          description: Empty returns map
+          content:
+            application/json:
+              example:
+                returns: {}
+
+  /api/performance:
+    get:
+      tags: [analytics]
+      summary: Portfolio performance time-series, drawdown, TWR and benchmark comparison
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+        - name: benchmark
+          in: query
+          description: Benchmark ticker symbol (e.g. URTH, CSPX.L)
+          schema:
+            type: string
+          example: "URTH"
+      responses:
+        "200":
+          description: Performance data
+          content:
+            application/json:
+              example:
+                series:
+                  - date: "2024-01-31"
+                    value: 45000.00
+                drawdown:
+                  - date: "2024-03-15"
+                    dd: -0.05
+                twr:
+                  - date: "2024-01-31"
+                    twr: 0.08
+                benchmark:
+                  - date: "2024-01-31"
+                    twr: 0.06
+                best_worst:
+                  best: []
+                  worst: []
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/cash_flow:
+    get:
+      tags: [financial]
+      summary: Cash flow summary — balance over time and labelled buckets
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Cash flow data
+          content:
+            application/json:
+              example:
+                balance:
+                  - date: "2024-01-31"
+                    balance: 2340.12
+                buckets:
+                  - label: "Deposits"
+                    value: 45000.00
+                  - label: "Withdrawals"
+                    value: -5000.00
+                  - label: "Dividends"
+                    value: 800.00
+                  - label: "Interest"
+                    value: 50.00
+                  - label: "Stock perks"
+                    value: 0.00
+                  - label: "Fees"
+                    value: -120.00
+                  - label: "Tax"
+                    value: -180.00
+                  - label: "Net invested"
+                    value: -39120.00
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/income:
+    get:
+      tags: [financial]
+      summary: Income log (dividends, interest, stock perks) with totals
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Income data
+          content:
+            application/json:
+              example:
+                log:
+                  - date: "2024-03-15"
+                    isin: "IE00B4L5Y983"
+                    name: "iShares MSCI World ETF"
+                    type: "DIVIDEND"
+                    amount: 42.50
+                totals:
+                  dividends: 800.00
+                  interest: 50.00
+                  stockperks: 0.00
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/realized:
+    get:
+      tags: [financial]
+      summary: Realized P&L entries with total
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Realized P&L data
+          content:
+            application/json:
+              example:
+                realized:
+                  - isin: "IE00B4L5Y983"
+                    name: "iShares MSCI World ETF"
+                    date: "2024-02-10"
+                    shares: 5.0
+                    sell_price: 82.00
+                    buy_price: 70.50
+                    pnl: 57.50
+                total: 1200.00
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/tax:
+    get:
+      tags: [financial]
+      summary: Tax records extracted from transactions
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Tax records
+          content:
+            application/json:
+              example:
+                records:
+                  - date: "2024-03-15"
+                    isin: "IE00B4L5Y983"
+                    name: "iShares MSCI World ETF"
+                    type: "DIVIDEND"
+                    gross: 57.14
+                    tax: 14.29
+                    net: 42.85
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/analytics:
+    get:
+      tags: [analytics]
+      summary: Analytics — monthly/annual returns, Sharpe, volatility, max drawdown days, sectors, P&L series
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Analytics data
+          content:
+            application/json:
+              example:
+                monthly:
+                  "2024":
+                    "01": 0.031
+                    "02": -0.012
+                annual:
+                  - year: 2024
+                    return: 0.182
+                sharpe: 1.24
+                volatility: 0.148
+                max_dd_days: 42
+                sectors:
+                  - label: "ETF"
+                    value: 45000.00
+                  - label: "Stock"
+                    value: 5000.00
+                pnl_series:
+                  - date: "2024-01-31"
+                    pnl: 3200.00
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/geographic:
+    get:
+      tags: [analytics]
+      summary: Geographic breakdown stub (returns empty country list)
+      responses:
+        "200":
+          description: Country breakdown
+          content:
+            application/json:
+              example:
+                countries: []
+
+  /api/fsa:
+    get:
+      tags: [financial]
+      summary: German Freistellungsauftrag (FSA) usage for the current year
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+        - name: joint
+          in: query
+          description: "Use joint allowance (2000 EUR instead of 1000 EUR)"
+          schema:
+            type: string
+            enum: ["true", "false"]
+          example: "false"
+      responses:
+        "200":
+          description: FSA usage
+          content:
+            application/json:
+              example:
+                year: 2024
+                limit: 1000.00
+                used: 437.50
+                remaining: 562.50
+                breakdown:
+                  dividends: 380.00
+                  interest: 20.00
+                  stockperks: 0.00
+                  vorabpauschale: 37.50
+                  realized_gains: 0.00
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/dividend_calendar:
+    get:
+      tags: [financial]
+      summary: Upcoming dividend calendar based on last known dividend per held ISIN
+      parameters:
+        - name: export
+          in: query
+          description: CSV export filename
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Upcoming dividends
+          content:
+            application/json:
+              example:
+                upcoming:
+                  - isin: "IE00B4L5Y983"
+                    name: "iShares MSCI World ETF"
+                    last_dividend_date: "2024-03-15"
+                    last_amount: 42.50
+        "404":
+          description: Export not found
+          content:
+            application/json:
+              example:
+                error: "export not found"
+
+  /api/watchlist:
+    get:
+      tags: [watchlist]
+      summary: Get current watchlist (requires session)
+      security:
+        - sessionCookie: []
+      responses:
+        "200":
+          description: Watchlist items
+          content:
+            application/json:
+              example:
+                items:
+                  - isin: "US0378331005"
+                    ticker: "AAPL"
+                    name: "Apple Inc."
+                    notes: "Waiting for dip"
+                    added_date: "2024-01-10"
+        "401":
+          description: No valid session
+          content:
+            application/json:
+              example:
+                error: "unauthorized"
+    post:
+      tags: [watchlist]
+      summary: Add an item to the watchlist (requires session)
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [isin, name]
+              properties:
+                isin:
+                  type: string
+                ticker:
+                  type: string
+                name:
+                  type: string
+                notes:
+                  type: string
+                added_date:
+                  type: string
+                  format: date
+            example:
+              isin: "US0378331005"
+              ticker: "AAPL"
+              name: "Apple Inc."
+              notes: "Watching for entry"
+      responses:
+        "200":
+          description: Updated watchlist
+          content:
+            application/json:
+              example:
+                items:
+                  - isin: "US0378331005"
+                    ticker: "AAPL"
+                    name: "Apple Inc."
+                    notes: "Watching for entry"
+                    added_date: "2024-05-21"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              example:
+                error: "isin is required"
+        "401":
+          description: No valid session
+          content:
+            application/json:
+              example:
+                error: "unauthorized"
+
+  /api/watchlist/{isin}:
+    delete:
+      tags: [watchlist]
+      summary: Remove an item from the watchlist (requires session)
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: isin
+          in: path
+          required: true
+          description: ISIN to remove
+          schema:
+            type: string
+          example: "US0378331005"
+      responses:
+        "200":
+          description: Updated watchlist after removal
+          content:
+            application/json:
+              example:
+                items: []
+        "400":
+          description: Missing ISIN
+          content:
+            application/json:
+              example:
+                error: "isin is required"
+        "401":
+          description: No valid session
+          content:
+            application/json:
+              example:
+                error: "unauthorized"
+
+  /api/market/search:
+    get:
+      tags: [market]
+      summary: Search for securities by name or ticker (proxied to pricer)
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Search query string
+          schema:
+            type: string
+          example: "Apple"
+      responses:
+        "200":
+          description: Search results
+          content:
+            application/json:
+              example:
+                results:
+                  - ticker: "AAPL"
+                    name: "Apple Inc."
+                    exchange: "NASDAQ"
+                    type: "EQUITY"
+        "400":
+          description: Missing query parameter
+          content:
+            application/json:
+              example:
+                error: "q is required"
+                results: []
+        "503":
+          description: Pricer service unavailable
+          content:
+            application/json:
+              example:
+                results: []
+
+  /api/market/quote:
+    get:
+      tags: [market]
+      summary: Real-time quote for a ticker symbol
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          description: Ticker symbol (e.g. AAPL, CSPX.L)
+          schema:
+            type: string
+          example: "AAPL"
+      responses:
+        "200":
+          description: Quote data
+          content:
+            application/json:
+              example:
+                ticker: "AAPL"
+                price: 189.30
+                change: 1.25
+                change_pct: 0.66
+                market_cap: 2930000000000
+                currency: "USD"
+        "400":
+          description: Missing ticker
+          content:
+            application/json:
+              example:
+                error: "ticker is required"
+        "503":
+          description: Pricer service unavailable
+          content:
+            application/json:
+              example:
+                error: "pricer returned 503"
+
+  /api/market/history:
+    get:
+      tags: [market]
+      summary: Historical OHLCV price series for a ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          description: Ticker symbol
+          schema:
+            type: string
+          example: "AAPL"
+        - name: range
+          in: query
+          description: "Time range (1D, 5D, 1M, 3M, 6M, 1Y, 5Y, MAX) — defaults to 1M"
+          schema:
+            type: string
+            enum: ["1D", "5D", "1M", "3M", "6M", "1Y", "5Y", "MAX"]
+          example: "1Y"
+      responses:
+        "200":
+          description: Price history
+          content:
+            application/json:
+              example:
+                series:
+                  - date: "2024-01-02"
+                    open: 184.00
+                    high: 186.50
+                    low: 183.20
+                    close: 185.85
+                    volume: 72000000
+        "400":
+          description: Missing ticker
+          content:
+            application/json:
+              example:
+                error: "ticker is required"
+                series: []
+
+  /api/market/news:
+    get:
+      tags: [market]
+      summary: Latest news headlines for a ticker
+      parameters:
+        - name: ticker
+          in: query
+          required: true
+          description: Ticker symbol
+          schema:
+            type: string
+          example: "AAPL"
+      responses:
+        "200":
+          description: News items
+          content:
+            application/json:
+              example:
+                news:
+                  - title: "Apple Reports Record Q1 Earnings"
+                    url: "https://example.com/apple-earnings"
+                    published_at: "2024-02-01T18:00:00Z"
+                    source: "Reuters"
+        "400":
+          description: Missing ticker
+          content:
+            application/json:
+              example:
+                error: "ticker is required"
+                news: []
+
+  /api/refresh_prices:
+    post:
+      tags: [actions]
+      summary: Trigger a price refresh (no-op — prices are fetched on demand)
+      responses:
+        "200":
+          description: Acknowledged
+          content:
+            application/json:
+              example:
+                status: "ok"
+
+  /api/upload:
+    post:
+      tags: [actions]
+      summary: Upload a CSV export file (max 10 MB)
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: CSV export file
+      responses:
+        "200":
+          description: File saved; returns filename and updated exports list
+          content:
+            application/json:
+              example:
+                filename: "2024-export.csv"
+                exports: ["2024-export.csv", "2023-export.csv"]
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              example:
+                error: "only CSV files accepted"
+        "413":
+          description: File too large
+          content:
+            application/json:
+              example:
+                error: "file too large (max 10 MB)"
+        "500":
+          description: Server error
+          content:
+            application/json:
+              example:
+                error: "write failed"
+
+  /api/auth/session:
+    get:
+      tags: [auth]
+      summary: Return the current authenticated session (user info or 401)
+      responses:
+        "200":
+          description: Active session
+          content:
+            application/json:
+              example:
+                user_id: "abc123"
+                email: "user@example.com"
+                name: "Jane Doe"
+        "401":
+          description: No active session
+          content:
+            application/json:
+              example:
+                error: "no session"
+
+  /api/auth/logout:
+    post:
+      tags: [auth]
+      summary: Invalidate the current session and clear the session cookie
+      responses:
+        "200":
+          description: Logged out
+          content:
+            application/json:
+              example:
+                status: "ok"
+
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: session
+      description: HTTP-only session cookie set by POST /api/auth/* endpoints

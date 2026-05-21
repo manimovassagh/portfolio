@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 
 	"github.com/manimovassagh/portfolio/internal/model"
 )
@@ -80,13 +81,30 @@ func Load(csvPath string) ([]model.Transaction, error) {
 		return row[i]
 	}
 
-	parseF := func(s string) float64 {
-		v, _ := strconv.ParseFloat(s, 64)
-		return v
+	parseF := func(s string) (float64, error) {
+		if s == "" {
+			return 0, nil
+		}
+		v, err := strconv.ParseFloat(s, 64)
+		if err != nil {
+			return 0, fmt.Errorf("cannot parse %q as number", s)
+		}
+		return v, nil
 	}
 
 	var txs []model.Transaction
-	for _, row := range records[1:] {
+	var errs []string
+	for i, row := range records[1:] {
+		rowNum := i + 2 // 1-based, row 1 is the header
+
+		parseCol := func(colName string) float64 {
+			v, err := parseF(col(row, colName))
+			if err != nil {
+				errs = append(errs, fmt.Sprintf("row %d, column %q: %s", rowNum, colName, err))
+			}
+			return v
+		}
+
 		txs = append(txs, model.Transaction{
 			DateTime:    col(row, "datetime"),
 			Date:        col(row, "date"),
@@ -95,13 +113,16 @@ func Load(csvPath string) ([]model.Transaction, error) {
 			AssetClass:  col(row, "asset_class"),
 			Name:        col(row, "name"),
 			ISIN:        col(row, "symbol"),
-			Shares:      parseF(col(row, "shares")),
-			Price:       parseF(col(row, "price")),
-			Amount:      parseF(col(row, "amount")),
-			Fee:         parseF(col(row, "fee")),
-			Tax:         parseF(col(row, "tax")),
+			Shares:      parseCol("shares"),
+			Price:       parseCol("price"),
+			Amount:      parseCol("amount"),
+			Fee:         parseCol("fee"),
+			Tax:         parseCol("tax"),
 			Description: col(row, "description"),
 		})
+	}
+	if len(errs) > 0 {
+		return nil, fmt.Errorf("CSV validation errors:\n  %s", strings.Join(errs, "\n  "))
 	}
 	return txs, nil
 }

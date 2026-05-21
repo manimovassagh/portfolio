@@ -64,6 +64,7 @@ func main() {
 
 	// Holdings
 	api.GET("/holdings", holdingsH.List)
+	api.GET("/holdings/export", holdingsH.Export)
 	api.GET("/holdings/:isin", holdingsH.Detail)
 
 	// Asset detail (different shape: current.unrealized vs current.unrealized_pnl)
@@ -100,6 +101,10 @@ func main() {
 	// Actions
 	api.POST("/refresh_prices", miscH.RefreshPrices)
 	api.POST("/upload", miscH.Upload)
+
+	// Docs (outside /api group — no auth required)
+	r.GET("/docs", coreH.DocsUI)
+	r.GET("/docs/openapi.yaml", coreH.DocsSpec)
 
 	addr := ":" + cfg.Port
 	_, certErr := os.Stat(cfg.TLSCert)
