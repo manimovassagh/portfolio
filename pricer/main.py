@@ -23,7 +23,7 @@ _MAX_TRANSACTIONS = 10_000
 _MAX_HISTORY_YEARS = 15
 
 from .hist_cache import download_cached
-from .prices import fetch_prices, resolve_tickers
+from .prices import KNOWN_TICKERS, fetch_prices, resolve_tickers
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="pricer", docs_url=None, redoc_url=None)
@@ -32,7 +32,7 @@ app = FastAPI(title="pricer", docs_url=None, redoc_url=None)
 def _validate_isins(isin_list: list[str]) -> None:
     if len(isin_list) > _MAX_ISINS:
         raise HTTPException(status_code=400, detail=f"too many ISINs: max {_MAX_ISINS}, got {len(isin_list)}")
-    bad = [i for i in isin_list if not _ISIN_RE.match(i)]
+    bad = [i for i in isin_list if not _ISIN_RE.match(i) and i not in KNOWN_TICKERS]
     if bad:
         raise HTTPException(status_code=400, detail=f"invalid ISIN format: {bad[:5]}")
 
