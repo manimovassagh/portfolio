@@ -90,7 +90,14 @@ export function TaxView({ data, exportName }: TaxViewProps) {
           </div>
         </Card>
       )}
-      <TableView title="Tax" subtitle="Vorabpauschale and withholding tax records" rows={data.tax} columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)', 'Description']} />
+      <TableView
+        title="Tax"
+        subtitle="Vorabpauschale and withholding tax records"
+        rows={data.tax}
+        columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)', 'Description']}
+        emptyTitle="No tax records yet"
+        emptyMessage="Withholding tax and Vorabpauschale entries will appear here once they exist in the selected export."
+      />
     </section>
   );
 }

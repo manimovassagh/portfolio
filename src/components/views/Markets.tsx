@@ -305,6 +305,7 @@ export function MarketsView() {
                       onClick={toggleStar}
                       disabled={starring}
                       title={isStarred ? 'Remove from watchlist' : 'Add to watchlist'}
+                      aria-label={isStarred ? `Remove ${selected.ticker} from watchlist` : `Add ${selected.ticker} to watchlist`}
                       className={`rounded-md p-1 transition ${isStarred ? 'text-amber-400 hover:text-amber-500' : 'text-slate-300 hover:text-amber-400 dark:text-slate-600 dark:hover:text-amber-400'}`}
                     >
                       <Star size={18} fill={isStarred ? 'currentColor' : 'none'} />

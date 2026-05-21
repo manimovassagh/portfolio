@@ -63,10 +63,10 @@ const PositionRangeValueSchema = z.object({
   pct: nullableNumber,
 });
 
-const PositionRangeMapSchema = z.record(PositionRangeValueSchema);
+const PositionRangeMapSchema = z.record(z.string(), PositionRangeValueSchema);
 
 export const PositionReturnsPayloadSchema = z.object({
-  returns: z.record(PositionRangeMapSchema),
+  returns: z.record(z.string(), PositionRangeMapSchema),
 });
 
 // ── Performance ───────────────────────────────────────────────────────────────
@@ -103,11 +103,11 @@ export const CashFlowSchema = z.object({
 
 // ── Income ────────────────────────────────────────────────────────────────────
 
-const IncomeRowSchema = z.record(z.union([z.string(), z.number(), z.null()]));
+const IncomeRowSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
 
 export const IncomePayloadSchema = z.object({
   log: z.array(IncomeRowSchema),
-  totals: z.record(z.number()),
+  totals: z.record(z.string(), z.number()),
 });
 
 // ── Realized ──────────────────────────────────────────────────────────────────
@@ -130,7 +130,7 @@ export const RealizedPayloadSchema = z.object({
 
 // ── Tax ───────────────────────────────────────────────────────────────────────
 
-const TaxRowSchema = z.record(z.union([z.string(), z.number(), z.null()]));
+const TaxRowSchema = z.record(z.string(), z.union([z.string(), z.number(), z.null()]));
 
 export const TaxPayloadSchema = z.object({
   records: z.array(TaxRowSchema),
@@ -139,7 +139,7 @@ export const TaxPayloadSchema = z.object({
 // ── Analytics ─────────────────────────────────────────────────────────────────
 
 export const AnalyticsSchema = z.object({
-  monthly: z.record(z.record(nullableNumber)),
+  monthly: z.record(z.string(), z.record(z.string(), nullableNumber)),
   annual: z.array(z.object({ year: z.number(), pnl: z.number(), pct: z.number() })),
   sharpe: nullableNumber,
   volatility: nullableNumber,
@@ -288,4 +288,28 @@ export const MarketNewsItemSchema = z.object({
 
 export const MarketNewsPayloadSchema = z.object({
   news: z.array(MarketNewsItemSchema),
+});
+
+// ── Auth ──────────────────────────────────────────────────────────────────────
+
+export const AuthUserSchema = z.object({
+  id: z.string(),
+  provider: z.string(),
+  email: z.string(),
+  name: z.string(),
+  created_at: z.string(),
+});
+
+export const AuthSessionSchema = z.object({
+  authenticated: z.boolean(),
+  required: z.boolean(),
+  user: AuthUserSchema.nullable().optional().transform((value) => value ?? null),
+});
+
+export const AuthProvidersSchema = z.object({
+  providers: z.object({
+    google: z.boolean(),
+    apple: z.boolean(),
+    passkey: z.boolean(),
+  }),
 });

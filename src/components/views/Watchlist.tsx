@@ -16,10 +16,17 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
   const [formOpen, setFormOpen] = useState(false);
   const [form, setForm]         = useState<WatchlistForm>(EMPTY_FORM);
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError]       = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { setWatchlist(await fetchWatchlist()); } catch { /* silently fail */ }
+    setError(null);
+    try {
+      setWatchlist(await fetchWatchlist());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not load watchlist');
+      setWatchlist(null);
+    }
     finally { setLoading(false); }
   }, []);
 
@@ -28,6 +35,7 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
   const handleAdd = async (e: FormEvent) => {
     e.preventDefault();
     setSubmitting(true);
+    setError(null);
     try {
       const data = await addWatchlistItem({
         isin: form.isin.trim(),
@@ -39,12 +47,19 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
       setWatchlist(data);
       setForm(EMPTY_FORM);
       setFormOpen(false);
-    } catch { /* silently fail */ }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add watchlist item');
+    }
     finally { setSubmitting(false); }
   };
 
   const handleDelete = async (isin: string) => {
-    try { setWatchlist(await removeWatchlistItem(isin)); } catch { /* silently fail */ }
+    setError(null);
+    try {
+      setWatchlist(await removeWatchlistItem(isin));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not remove watchlist item');
+    }
   };
 
   const fields = [
@@ -96,7 +111,21 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
 
       {loading && <div className="h-32 animate-pulse rounded-xl bg-slate-200 dark:bg-slate-800" />}
 
-      {!loading && watchlist?.items.length === 0 && (
+      {error && (
+        <Card className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h3 className="text-base font-black text-rose-500">Watchlist unavailable</h3>
+              <p className="mt-1 text-sm font-semibold text-slate-500">{error}</p>
+            </div>
+            <button onClick={load} className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700">
+              Retry
+            </button>
+          </div>
+        </Card>
+      )}
+
+      {!loading && !error && watchlist?.items.length === 0 && (
         <Card className="p-8 text-center">
           <Star size={32} className="mx-auto text-slate-400" />
           <h3 className="mt-3 text-base font-black">Nothing on the watchlist</h3>
@@ -104,7 +133,7 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
         </Card>
       )}
 
-      {watchlist && watchlist.items.length > 0 && (
+      {!error && watchlist && watchlist.items.length > 0 && (
         <Card className="overflow-hidden">
           <div className="overflow-x-auto">
             <table className="pro-table min-w-[900px]">

@@ -1,32 +1,48 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
 )
 
 type MarketHandler struct {
-	cfg config.Config
+	cfg        config.Config
+	httpClient *http.Client
 }
 
 func NewMarketHandler(cfg config.Config) *MarketHandler {
-	return &MarketHandler{cfg: cfg}
+	return &MarketHandler{
+		cfg:        cfg,
+		httpClient: &http.Client{Timeout: 10 * time.Second},
+	}
 }
 
 func (h *MarketHandler) pricerGet(path string, params url.Values) (any, error) {
 	u := fmt.Sprintf("%s%s?%s", h.cfg.PricerURL, path, params.Encode())
-	resp, err := http.Get(u) //nolint:gosec
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	body, err := io.ReadAll(resp.Body)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("pricer returned %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 2*1024*1024))
 	if err != nil {
 		return nil, err
 	}
@@ -38,7 +54,11 @@ func (h *MarketHandler) pricerGet(path string, params url.Values) (any, error) {
 }
 
 func (h *MarketHandler) Search(c *gin.Context) {
-	q := c.Query("q")
+	q := strings.TrimSpace(c.Query("q"))
+	if q == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "q is required", "results": []any{}})
+		return
+	}
 	result, err := h.pricerGet("/search", url.Values{"q": {q}})
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"results": []any{}})
@@ -48,7 +68,11 @@ func (h *MarketHandler) Search(c *gin.Context) {
 }
 
 func (h *MarketHandler) Quote(c *gin.Context) {
-	ticker := c.Query("ticker")
+	ticker := strings.TrimSpace(c.Query("ticker"))
+	if ticker == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ticker is required"})
+		return
+	}
 	result, err := h.pricerGet("/quote", url.Values{"ticker": {ticker}})
 	if err != nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
@@ -58,8 +82,12 @@ func (h *MarketHandler) Quote(c *gin.Context) {
 }
 
 func (h *MarketHandler) History(c *gin.Context) {
-	ticker := c.Query("ticker")
-	rangeParam := c.Query("range")
+	ticker := strings.TrimSpace(c.Query("ticker"))
+	if ticker == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ticker is required", "series": []any{}})
+		return
+	}
+	rangeParam := strings.TrimSpace(c.Query("range"))
 	if rangeParam == "" {
 		rangeParam = "1M"
 	}
@@ -72,7 +100,11 @@ func (h *MarketHandler) History(c *gin.Context) {
 }
 
 func (h *MarketHandler) News(c *gin.Context) {
-	ticker := c.Query("ticker")
+	ticker := strings.TrimSpace(c.Query("ticker"))
+	if ticker == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ticker is required", "news": []any{}})
+		return
+	}
 	result, err := h.pricerGet("/news", url.Values{"ticker": {ticker}})
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"news": []any{}})

@@ -27,6 +27,7 @@ func main() {
 	portfolioH := handler.NewPortfolioHandler(cfg, pricerClient)
 	watchlistH := handler.NewWatchlistHandler(store)
 	coreH := handler.NewCoreHandler(cfg)
+	authH := handler.NewAuthHandler(cfg, store)
 	cashFlowH := handler.NewCashFlowHandler(cfg)
 	incomeH := handler.NewIncomeHandler(cfg)
 	realizedH := handler.NewRealizedHandler(cfg)
@@ -45,6 +46,16 @@ func main() {
 
 	// Core
 	api.GET("/health", coreH.Health)
+
+	// Auth
+	api.GET("/auth/session", authH.Session)
+	api.GET("/auth/providers", authH.Providers)
+	api.POST("/auth/google", authH.Google)
+	api.POST("/auth/apple", authH.Apple)
+	api.POST("/auth/passkey/begin", authH.PasskeyBegin)
+	api.POST("/auth/dev", authH.DevLogin)
+	api.POST("/auth/logout", authH.Logout)
+
 	api.GET("/exports", coreH.Exports)
 
 	// Portfolio summary
@@ -72,10 +83,13 @@ func main() {
 	api.GET("/fsa", miscH.FSA)
 	api.GET("/dividend_calendar", miscH.DividendCalendar)
 
+	persisted := api.Group("")
+	persisted.Use(middleware.RequireSession(cfg, store))
+
 	// Watchlist
-	api.GET("/watchlist", watchlistH.Get)
-	api.POST("/watchlist", watchlistH.Add)
-	api.DELETE("/watchlist/:isin", watchlistH.Remove)
+	persisted.GET("/watchlist", watchlistH.Get)
+	persisted.POST("/watchlist", watchlistH.Add)
+	persisted.DELETE("/watchlist/:isin", watchlistH.Remove)
 
 	// Market data (proxied to Python pricer)
 	api.GET("/market/search", marketH.Search)

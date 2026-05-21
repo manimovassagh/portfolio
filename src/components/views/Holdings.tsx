@@ -28,7 +28,20 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
             </thead>
             <tbody>
               {data.holdings.map((h) => (
-                <tr key={h.isin} onClick={() => openAsset(h)} className="cursor-pointer">
+                <tr
+                  key={h.isin}
+                  onClick={() => openAsset(h)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openAsset(h);
+                    }
+                  }}
+                  className="cursor-pointer focus:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-[#45b9a8]/50 dark:focus:bg-slate-800/60"
+                  tabIndex={0}
+                  role="button"
+                  aria-label={`Open details for ${h.name}`}
+                >
                   <td>
                     <div className="font-bold">{h.name}</div>
                     <div className="num text-xs text-slate-500">{h.isin}</div>
