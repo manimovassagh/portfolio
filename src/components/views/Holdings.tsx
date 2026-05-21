@@ -18,9 +18,19 @@ function HoldingsEmpty() {
 interface HoldingsViewProps {
   data: DashboardData;
   openAsset: (holding: Holding) => void;
+  livePrices?: Record<string, number>;
 }
 
-export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
+function applyLivePrice(h: Holding, livePrices: Record<string, number> = {}): Holding {
+  const livePrice = livePrices[h.isin];
+  if (livePrice == null) return h;
+  const liveMV = livePrice * h.shares;
+  const livePnl = liveMV - h.cost_basis;
+  const livePct = h.cost_basis !== 0 ? (livePnl / h.cost_basis) * 100 : null;
+  return { ...h, current_price: livePrice, market_value: liveMV, unrealized_pnl: livePnl, unrealized_pct: livePct };
+}
+
+export function HoldingsView({ data, openAsset, livePrices = {} }: HoldingsViewProps) {
   const hasConcentrated = data.holdings.some((h) => h.weight > 20);
 
   const handleExport = () => {
@@ -52,7 +62,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
         <>
           {/* Mobile card view */}
           <div className="sm:hidden space-y-2">
-            {data.holdings.map((h) => (
+            {data.holdings.map((raw) => { const h = applyLivePrice(raw, livePrices); return (
               <div
                 key={h.isin}
                 className="rounded-lg border border-slate-200 bg-white p-4 dark:border-[#2b2b2b] dark:bg-[#1a1a1a] cursor-pointer"
@@ -83,7 +93,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
                   <div className={`num text-right font-bold ${(h.unrealized_pct || 0) >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>{pct(h.unrealized_pct)}</div>
                 </div>
               </div>
-            ))}
+            ); })}
           </div>
 
           {/* Desktop table view */}
@@ -95,7 +105,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
                     <tr><th>Asset</th><th>Class</th><th>Shares</th><th>Avg cost</th><th>Price</th><th>Market value</th><th>P&L</th><th>P&L %</th><th>Yield</th><th>Weight</th></tr>
                   </thead>
                   <tbody>
-                    {data.holdings.map((h) => (
+                    {data.holdings.map((raw) => { const h = applyLivePrice(raw, livePrices); return (
                       <tr
                         key={h.isin}
                         onClick={() => openAsset(h)}
@@ -129,7 +139,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
                           </span>
                         </td>
                       </tr>
-                    ))}
+                    ); })}
                   </tbody>
                 </table>
               </div>
