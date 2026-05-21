@@ -25,7 +25,7 @@ func main() {
 
 	holdingsH := handler.NewHoldingsHandler(cfg, pricerClient)
 	portfolioH := handler.NewPortfolioHandler(cfg, pricerClient)
-	watchlistH := handler.NewWatchlistHandler(store)
+	watchlistH := handler.NewWatchlistHandler(store, pricerClient)
 	coreH := handler.NewCoreHandler(cfg, store, pricerClient)
 	authH := handler.NewAuthHandler(cfg, store)
 	cashFlowH := handler.NewCashFlowHandler(cfg)
