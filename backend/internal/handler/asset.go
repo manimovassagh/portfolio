@@ -23,14 +23,9 @@ func NewAssetHandler(cfg config.Config, p *pricer.Client) *AssetHandler {
 
 func (h *AssetHandler) Get(c *gin.Context) {
 	isin := c.Param("isin")
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

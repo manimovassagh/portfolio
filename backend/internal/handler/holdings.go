@@ -25,11 +25,7 @@ func NewHoldingsHandler(cfg config.Config, p *pricer.Client) *HoldingsHandler {
 }
 
 func (h *HoldingsHandler) loadAndEnrich(exportName string) ([]model.Holding, error) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, exportName)
-	if err != nil {
-		return nil, err
-	}
-	txs, err := loader.Load(csvPath)
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, exportName)
 	if err != nil {
 		return nil, err
 	}
@@ -73,12 +69,7 @@ func (h *HoldingsHandler) List(c *gin.Context) {
 
 func (h *HoldingsHandler) Detail(c *gin.Context) {
 	isin := c.Param("isin")
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

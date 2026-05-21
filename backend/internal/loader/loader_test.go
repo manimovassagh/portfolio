@@ -150,6 +150,38 @@ func TestLoad_MalformedNumericField(t *testing.T) {
 	}
 }
 
+// TestLoadAll merges transactions from multiple CSVs in a temp dir.
+func TestLoadAll(t *testing.T) {
+	dir := t.TempDir()
+	row := "2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,10,80.50,805.00,0.99,0.00,\n"
+	for _, name := range []string{"a.csv", "b.csv"} {
+		os.WriteFile(filepath.Join(dir, name), []byte(csvHeader+row), 0644)
+	}
+	txs, err := loader.LoadAll(dir)
+	if err != nil {
+		t.Fatalf("LoadAll failed: %v", err)
+	}
+	if len(txs) != 2 {
+		t.Fatalf("expected 2 transactions (one per CSV), got %d", len(txs))
+	}
+}
+
+// TestLoadExport_All checks that export="all" merges all CSVs via LoadExport.
+func TestLoadExport_All(t *testing.T) {
+	dir := t.TempDir()
+	row := "2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,10,80.50,805.00,0.99,0.00,\n"
+	for _, name := range []string{"x.csv", "y.csv"} {
+		os.WriteFile(filepath.Join(dir, name), []byte(csvHeader+row), 0644)
+	}
+	txs, err := loader.LoadExport(dir, "all")
+	if err != nil {
+		t.Fatalf("LoadExport('all') failed: %v", err)
+	}
+	if len(txs) != 2 {
+		t.Fatalf("expected 2 merged transactions, got %d", len(txs))
+	}
+}
+
 // TestLoad_MultipleErrors checks that all validation failures across rows are collected.
 func TestLoad_MultipleErrors(t *testing.T) {
 	// Row 2: bad shares; Row 3: bad amount

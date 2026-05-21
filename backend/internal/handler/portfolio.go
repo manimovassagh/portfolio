@@ -12,6 +12,15 @@ import (
 	"github.com/manimovassagh/portfolio/internal/service"
 )
 
+// exportLabel returns the display name for an export selection.
+// "all" is passed through as-is; otherwise the bare filename is returned.
+func exportLabel(name string) string {
+	if name == "all" {
+		return "all"
+	}
+	return filepath.Base(name)
+}
+
 type PortfolioHandler struct {
 	cfg    config.Config
 	pricer *pricer.Client
@@ -22,12 +31,7 @@ func NewPortfolioHandler(cfg config.Config, p *pricer.Client) *PortfolioHandler 
 }
 
 func (h *PortfolioHandler) Overview(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -49,14 +53,9 @@ func (h *PortfolioHandler) Overview(c *gin.Context) {
 }
 
 func (h *PortfolioHandler) Summary(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -98,7 +97,7 @@ func (h *PortfolioHandler) Summary(c *gin.Context) {
 	xirr := service.XIRR(txs, portfolioValue)
 
 	resp := model.SummaryResponse{
-		Export:         filepath.Base(csvPath),
+		Export:         exportLabel(c.Query("export")),
 		PortfolioValue: portfolioValue,
 		MarketValue:    marketValue,
 		CashBalance:    cash.CashBalance,
