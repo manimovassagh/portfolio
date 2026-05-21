@@ -12,6 +12,8 @@ from typing import Any
 import pandas as pd
 import yfinance as yf
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import JSONResponse
+from pathlib import Path
 from pydantic import BaseModel
 
 from .hist_cache import download_cached
@@ -34,6 +36,21 @@ def get_prices(isins: str = Query(..., description="Comma-separated ISIN list"))
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/readyz")
+def readyz() -> JSONResponse:
+    checks: dict[str, str] = {}
+    try:
+        Path("cache").mkdir(parents=True, exist_ok=True)
+        (Path("cache") / ".probe").touch()
+        checks["cache"] = "ok"
+    except Exception as e:
+        checks["cache"] = str(e)
+
+    status = "ok" if all(v == "ok" for v in checks.values()) else "degraded"
+    code = 200 if status == "ok" else 503
+    return JSONResponse({"status": status, "checks": checks}, status_code=code)
 
 
 @app.post("/cache/clear")
