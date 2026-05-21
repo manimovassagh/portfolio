@@ -3,6 +3,17 @@ import { PanelHeader } from '../ui/PanelTitle';
 import { fmtEUR, signedEUR, pct } from '../../lib/format';
 import type { DashboardData, Holding } from '../../types';
 
+function HoldingsEmpty() {
+  return (
+    <Card className="p-8 text-center">
+      <h3 className="text-base font-black text-slate-900 dark:text-white">No holdings found</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm font-semibold text-slate-500">
+        Import a Trade Republic CSV export to get started — your open positions will appear here.
+      </p>
+    </Card>
+  );
+}
+
 interface HoldingsViewProps {
   data: DashboardData;
   openAsset: (holding: Holding) => void;
@@ -20,6 +31,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
           Holdings above 20% of portfolio are flagged
         </div>
       )}
+      {data.holdings.length === 0 ? <HoldingsEmpty /> : (
       <Card className="overflow-hidden">
         <div className="overflow-x-auto">
           <table className="pro-table min-w-[1100px]">
@@ -66,6 +78,7 @@ export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
           </table>
         </div>
       </Card>
+      )}
     </section>
   );
 }

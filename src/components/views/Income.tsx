@@ -21,8 +21,8 @@ export function IncomeView({ data }: IncomeViewProps) {
         subtitle={`Total ${fmtEUR(total)}`}
         rows={data.income}
         columns={['Date', 'Type', 'Asset', 'Amount (EUR)', 'Tax (EUR)']}
-        emptyTitle="No income yet"
-        emptyMessage="Dividend, interest, and stock perk transactions will appear here once they exist in the selected export."
+        emptyTitle="No dividend income yet"
+        emptyMessage="Income appears once dividend transactions are in your export."
       />
       {calendar && calendar.upcoming.length > 0 && (
         <Card className="p-5">
