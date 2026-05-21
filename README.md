@@ -88,12 +88,17 @@ make exports    List CSV files in exports/
 ## Run with Docker
 
 ```bash
-make docker        # build images, generate certs, start stack
-make docker-down   # stop stack
+make docker        # build images and start stack
+make docker-down   # stop and remove containers
 make docker-logs   # follow logs
 ```
 
-> **Note:** The Docker Compose file currently targets the legacy Python backend. See [issue #TBD] for the Go backend Docker migration.
+After `make docker`:
+- Frontend: `http://localhost`
+- Go backend: `https://localhost:8766`
+- Pricer: `http://localhost:8001`
+
+Place your CSV exports in `exports/` before starting — they are volume-mounted.
 
 ---
 
