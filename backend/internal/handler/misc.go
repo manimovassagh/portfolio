@@ -52,11 +52,14 @@ func (h *MiscHandler) Performance(c *gin.Context) {
 		})
 	}
 
+	benchmarkTicker := c.Query("benchmark") // e.g. "URTH" or "CSPX.L"
+
 	series := []pricer.PerfPoint{}
 	drawdown := []pricer.DDPoint{}
 	twr := []pricer.TWRPoint{}
+	benchmark := []pricer.TWRPoint{}
 
-	if perf, pErr := h.pricer.PostPortfolioPerformance(pricerTxs); pErr == nil && perf != nil {
+	if perf, pErr := h.pricer.PostPortfolioPerformance(pricerTxs, benchmarkTicker); pErr == nil && perf != nil {
 		if perf.Series != nil {
 			series = perf.Series
 		}
@@ -66,13 +69,16 @@ func (h *MiscHandler) Performance(c *gin.Context) {
 		if perf.TWR != nil {
 			twr = perf.TWR
 		}
+		if perf.Benchmark != nil {
+			benchmark = perf.Benchmark
+		}
 	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"series":    series,
 		"drawdown":  drawdown,
 		"twr":       twr,
-		"benchmark": nil,
+		"benchmark": benchmark,
 		"best_worst": gin.H{
 			"best":  []gin.H{},
 			"worst": []gin.H{},

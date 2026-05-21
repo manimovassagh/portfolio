@@ -171,6 +171,7 @@ class AnalyticsTxIn(BaseModel):
 
 class PortfolioAnalyticsRequest(BaseModel):
     transactions: list[AnalyticsTxIn]
+    benchmark: str = "URTH"
 
 
 _MONTH_ABBREVS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -373,12 +374,12 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
     """
     filtered = [t for t in req.transactions if t.isin and t.date]
     if not filtered:
-        return {"series": [], "drawdown": [], "twr": []}
+        return {"series": [], "drawdown": [], "twr": [], "benchmark": []}
 
     isins = list({t.isin for t in filtered})
     tickers_map = resolve_tickers(isins)
     if not tickers_map:
-        return {"series": [], "drawdown": [], "twr": []}
+        return {"series": [], "drawdown": [], "twr": [], "benchmark": []}
 
     start_date = min(t.date for t in filtered)
     tickers = list(set(tickers_map.values()))
@@ -393,7 +394,7 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
         close = close.ffill()
     except Exception as exc:
         logger.exception("yfinance download failed: %s", exc)
-        return {"series": [], "drawdown": [], "twr": []}
+        return {"series": [], "drawdown": [], "twr": [], "benchmark": []}
 
     non_eur = [t for t in tickers if not _is_eur_ticker(t)]
     if non_eur:
@@ -492,7 +493,42 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
         prev_dt = dt
 
     if not pv_list:
-        return {"series": [], "drawdown": [], "twr": []}
+        return {"series": [], "drawdown": [], "twr": [], "benchmark": []}
+
+    # Compute benchmark TWR series
+    benchmark_series: list[dict[str, Any]] = []
+    try:
+        bm_ticker = req.benchmark.strip() if req.benchmark else "URTH"
+        bm_raw = yf.download(bm_ticker, start=start_date, auto_adjust=True, progress=False)
+        if bm_raw is not None and not bm_raw.empty:
+            bm_close = bm_raw["Close"].ffill()
+            # Filter to dates present in our date_list range
+            date_set = {dt.strftime("%Y-%m-%d") for dt in date_list}
+            first_portfolio_date = date_list[0].strftime("%Y-%m-%d")
+            bm_factor = 1.0
+            bm_prev_price: float | None = None
+            for ts, row in bm_close.items():
+                ts_str = ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10]
+                if ts_str < first_portfolio_date:
+                    bm_prev_price = float(row)
+                    continue
+                price = float(row)
+                if not math.isfinite(price):
+                    continue
+                if bm_prev_price is not None and bm_prev_price > 0:
+                    bm_factor *= (1 + (price - bm_prev_price) / bm_prev_price)
+                elif bm_prev_price is None:
+                    # First data point at or after portfolio start
+                    pass
+                bm_prev_price = price
+                if ts_str in date_set:
+                    benchmark_series.append({
+                        "date": ts_str,
+                        "twr": round((bm_factor - 1) * 100, 4),
+                    })
+    except Exception as exc:
+        logger.exception("benchmark download failed: %s", exc)
+        benchmark_series = []
 
     return {
         "series": [
@@ -512,4 +548,5 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
             {"date": dt.strftime("%Y-%m-%d"), "twr": round(float(v), 4)}
             for dt, v in zip(date_list, twr_list)
         ],
+        "benchmark": benchmark_series,
     }

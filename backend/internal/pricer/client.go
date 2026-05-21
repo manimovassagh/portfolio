@@ -107,9 +107,10 @@ func (c *Client) PostPortfolioAnalytics(txs []AnalyticsTx) (*PortfolioAnalyticsR
 
 // PerformanceSeries is the response from POST /portfolio_performance.
 type PerformanceSeries struct {
-	Series   []PerfPoint `json:"series"`
-	Drawdown []DDPoint   `json:"drawdown"`
-	TWR      []TWRPoint  `json:"twr"`
+	Series    []PerfPoint `json:"series"`
+	Drawdown  []DDPoint   `json:"drawdown"`
+	TWR       []TWRPoint  `json:"twr"`
+	Benchmark []TWRPoint  `json:"benchmark"`
 }
 
 // PerfPoint is one day in the portfolio value time series.
@@ -133,9 +134,14 @@ type TWRPoint struct {
 }
 
 // PostPortfolioPerformance returns the daily portfolio time series for the hero chart.
-func (c *Client) PostPortfolioPerformance(txs []AnalyticsTx) (*PerformanceSeries, error) {
+// benchmark is an optional yfinance ticker (e.g. "URTH", "CSPX.L"); empty string means use the pricer default.
+func (c *Client) PostPortfolioPerformance(txs []AnalyticsTx, benchmark string) (*PerformanceSeries, error) {
+	payload := map[string]any{"transactions": txs}
+	if benchmark != "" {
+		payload["benchmark"] = benchmark
+	}
 	var result PerformanceSeries
-	if err := c.postJSON("/portfolio_performance", map[string]any{"transactions": txs}, &result); err != nil {
+	if err := c.postJSON("/portfolio_performance", payload, &result); err != nil {
 		return nil, err
 	}
 	return &result, nil

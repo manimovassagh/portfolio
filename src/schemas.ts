@@ -71,6 +71,8 @@ export const PositionReturnsPayloadSchema = z.object({
 
 // ── Performance ───────────────────────────────────────────────────────────────
 
+const BenchmarkPointSchema = z.object({ date: z.string(), twr: z.number() });
+
 export const PerformanceSchema = z.object({
   series: z.array(
     z.object({
@@ -82,12 +84,7 @@ export const PerformanceSchema = z.object({
   ),
   drawdown: z.array(z.object({ date: z.string(), drawdown: z.number() })),
   twr: z.array(z.object({ date: z.string(), twr: z.number() })),
-  benchmark: z
-    .object({
-      name: z.string(),
-      series: z.array(z.object({ date: z.string(), value: nullableNumber })),
-    })
-    .nullable(),
+  benchmark: z.array(BenchmarkPointSchema).nullable().optional().transform((v) => v ?? null),
   best_worst: z.object({
     best: z.array(z.object({ date: z.string(), pnl: z.number() })),
     worst: z.array(z.object({ date: z.string(), pnl: z.number() })),

@@ -70,11 +70,13 @@ export type Holding = {
 export type PositionRange = '1D' | '1W' | '1M' | 'YTD' | '1Y';
 export type PositionReturns = Record<string, Record<PositionRange, { pnl: number | null; pct: number | null }>>;
 
+export type BenchmarkPoint = { date: string; twr: number };
+
 export type Performance = {
   series: Array<{ date: string; portfolio_value: number | null; contributions: number | null; holdings_value: number | null }>;
   drawdown: Array<{ date: string; drawdown: number }>;
   twr: Array<{ date: string; twr: number }>;
-  benchmark: null | { name: string; series: Array<{ date: string; value: number | null }> };
+  benchmark: BenchmarkPoint[] | null;
   best_worst: {
     best: Array<{ date: string; pnl: number }>;
     worst: Array<{ date: string; pnl: number }>;
