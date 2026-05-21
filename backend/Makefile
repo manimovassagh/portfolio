@@ -1,0 +1,13 @@
+.PHONY: build run test tidy
+
+build:
+	go build -o bin/api ./cmd/api
+
+run:
+	go run ./cmd/api
+
+test:
+	go test ./... -v
+
+tidy:
+	go mod tidy
