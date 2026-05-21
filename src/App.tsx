@@ -3,6 +3,7 @@ import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu,
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { getAuthSession, listExports, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
+import { useLivePrices } from './lib/useLivePrices';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
 import { AuthScreen } from './components/AuthScreen';
@@ -105,6 +106,8 @@ export default function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
+
+  const livePrices = useLivePrices(exportName || null);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -304,7 +307,7 @@ export default function App() {
         <Suspense fallback={<SkeletonDashboard />}>
           {active === 'overview'  && <Overview data={data} dark={dark} chartMode={chartMode} setChartMode={setChartMode} openAsset={openAsset} navigate={navigate} />}
           {active === 'analytics' && <AnalyticsView data={data} dark={dark} />}
-          {active === 'holdings'  && <HoldingsView data={data} openAsset={openAsset} />}
+          {active === 'holdings'  && <HoldingsView data={data} openAsset={openAsset} livePrices={livePrices} />}
           {active === 'cash'      && <CashView data={data} dark={dark} />}
           {active === 'income'    && <IncomeView data={data} />}
           {active === 'realized'  && <RealizedView data={data} />}
@@ -320,7 +323,7 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
     );
-  }, [acceptAuthSession, active, authSession?.authenticated, chartMode, dark, data, exportName, navigate, openAsset]);
+  }, [acceptAuthSession, active, authSession?.authenticated, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-black dark:text-slate-100">

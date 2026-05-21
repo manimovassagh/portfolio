@@ -36,6 +36,7 @@ func main() {
 	assetH := handler.NewAssetHandler(cfg, pricerClient)
 	miscH := handler.NewMiscHandler(cfg, pricerClient)
 	marketH := handler.NewMarketHandler(cfg)
+	pricesWSH := handler.NewPricesWSHandler(cfg, pricerClient)
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -98,6 +99,9 @@ func main() {
 	api.GET("/market/quote",   middleware.RateLimit(5, 3), marketH.Quote)
 	api.GET("/market/history", middleware.RateLimit(5, 3), marketH.History)
 	api.GET("/market/news",    middleware.RateLimit(5, 3), marketH.News)
+
+	// WebSocket live prices
+	api.GET("/ws/prices", pricesWSH.Stream)
 
 	// Actions
 	api.POST("/refresh_prices", miscH.RefreshPrices)
