@@ -49,6 +49,35 @@ func ListExports(dir string) []string {
 	return entries
 }
 
+// LoadExport loads transactions for a named export, or all exports merged when name is "all".
+func LoadExport(dir, name string) ([]model.Transaction, error) {
+	if name == "all" {
+		return LoadAll(dir)
+	}
+	p, err := ResolveExport(dir, name)
+	if err != nil {
+		return nil, err
+	}
+	return Load(p)
+}
+
+// LoadAll loads and concatenates transactions from every CSV in dir.
+func LoadAll(dir string) ([]model.Transaction, error) {
+	paths := ListExports(dir)
+	if len(paths) == 0 {
+		return nil, fmt.Errorf("no CSV exports found in %s", dir)
+	}
+	var all []model.Transaction
+	for _, p := range paths {
+		txs, err := Load(p)
+		if err != nil {
+			return nil, fmt.Errorf("loading %s: %w", filepath.Base(p), err)
+		}
+		all = append(all, txs...)
+	}
+	return all, nil
+}
+
 // Load reads a Trade Republic CSV export and returns parsed transactions.
 func Load(csvPath string) ([]model.Transaction, error) {
 	f, err := os.Open(csvPath)

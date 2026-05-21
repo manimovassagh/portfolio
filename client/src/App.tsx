@@ -433,7 +433,8 @@ export default function App() {
                     className="hidden h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm md:block dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-100"
                     disabled={loading}
                   >
-                    {exports.map((item) => <option key={item}>{item}</option>)}
+                    <option value="all">All (merged)</option>
+                    {exports.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
                 )}
                 <label className="hidden h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 lg:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]">

@@ -103,14 +103,9 @@ func (h *PricesWSHandler) resolveISINs(c *gin.Context) []string {
 		return out
 	}
 
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		log.Printf("ws/prices: export not found: %v", err)
-		return nil
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		log.Printf("ws/prices: load failed: %v", err)
 		return nil
 	}
 

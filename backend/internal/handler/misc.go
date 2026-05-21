@@ -31,14 +31,9 @@ func (h *MiscHandler) PositionReturns(c *gin.Context) {
 }
 
 func (h *MiscHandler) Performance(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -89,12 +84,7 @@ func (h *MiscHandler) Performance(c *gin.Context) {
 
 // Geographic returns portfolio value grouped by issuing country from ISIN prefix.
 func (h *MiscHandler) Geographic(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
-	if err != nil {
-		c.JSON(http.StatusOK, gin.H{"countries": []gin.H{}})
-		return
-	}
-	txs, err := loader.Load(csvPath)
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"countries": []gin.H{}})
 		return
@@ -156,14 +146,9 @@ func isoCountryName(code string) string {
 
 // FSA computes the German Freistellungsauftrag (tax-free allowance) usage.
 func (h *MiscHandler) FSA(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -219,14 +204,9 @@ func (h *MiscHandler) FSA(c *gin.Context) {
 
 // DividendCalendar returns upcoming dividends based on past dividend history.
 func (h *MiscHandler) DividendCalendar(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 

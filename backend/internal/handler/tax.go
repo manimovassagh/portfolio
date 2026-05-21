@@ -19,14 +19,9 @@ func NewTaxHandler(cfg config.Config) *TaxHandler {
 }
 
 func (h *TaxHandler) Get(c *gin.Context) {
-	csvPath, err := loader.ResolveExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
-		return
-	}
-	txs, err := loader.Load(csvPath)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
