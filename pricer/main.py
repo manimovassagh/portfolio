@@ -365,44 +365,151 @@ def portfolio_analytics(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
 
 @app.post("/portfolio_performance")
 def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
-    """Build the daily portfolio time series for the hero chart on the overview page."""
-    result = _compute_portfolio_series(req.transactions)
-    if result is None:
+    """Build the daily portfolio time series for the hero chart on the overview page.
+
+    TWR is computed as:  daily_return = Σ(shares_start_of_day × Δprice) / pv_start_of_day
+    Using start-of-day shares (before that day's transactions) completely excludes the
+    distortion caused by new deposits — buying more shares has zero effect on the return.
+    """
+    filtered = [t for t in req.transactions if t.isin and t.date]
+    if not filtered:
         return {"series": [], "drawdown": [], "twr": []}
-    pv_series, cb_series = result
 
-    pnl_series = pv_series - cb_series
+    isins = list({t.isin for t in filtered})
+    tickers_map = resolve_tickers(isins)
+    if not tickers_map:
+        return {"series": [], "drawdown": [], "twr": []}
 
-    # Drawdown: (pv - running_max) / running_max * 100  (always ≤ 0)
-    running_max = pv_series.expanding().max()
-    dd_series = ((pv_series - running_max) / running_max * 100).fillna(0.0)
+    start_date = min(t.date for t in filtered)
+    tickers = list(set(tickers_map.values()))
 
-    # Cumulative TWR: links daily market returns multiplicatively to exclude cash-flow effects
-    # daily_market_return = ΔunrealisedPnL / prev_day_pv
-    pnl_daily_change = pnl_series.diff().fillna(0.0)
-    prev_pv = pv_series.shift(1).fillna(pv_series.iloc[0])
-    daily_mr = (pnl_daily_change / prev_pv).fillna(0.0)
-    twr_factor = (1 + daily_mr).cumprod()
-    twr_series = (twr_factor - 1) * 100
+    try:
+        if len(tickers) == 1:
+            raw = yf.download(tickers[0], start=start_date, auto_adjust=True, progress=False)
+            close = pd.DataFrame({tickers[0]: raw["Close"]})
+        else:
+            raw = yf.download(tickers, start=start_date, auto_adjust=True, progress=False)
+            close = raw["Close"]
+        close = close.ffill()
+    except Exception as exc:
+        logger.exception("yfinance download failed: %s", exc)
+        return {"series": [], "drawdown": [], "twr": []}
 
-    series = [
-        {
-            "date": dt.strftime("%Y-%m-%d"),
-            "portfolio_value": round(float(pv), 2),
-            "contributions": round(float(cb), 2),
-            "holdings_value": round(float(pv), 2),
-        }
-        for dt, pv, cb in zip(pv_series.index, pv_series, cb_series)
-        if math.isfinite(float(pv))
-    ]
-    drawdown = [
-        {"date": dt.strftime("%Y-%m-%d"), "drawdown": round(float(v), 4)}
-        for dt, v in dd_series.items()
-    ]
-    twr = [
-        {"date": dt.strftime("%Y-%m-%d"), "twr": round(float(v), 4)}
-        for dt, v in twr_series.items()
-        if math.isfinite(float(v))
-    ]
+    non_eur = [t for t in tickers if not _is_eur_ticker(t)]
+    if non_eur:
+        try:
+            fx_raw = yf.download("EURUSD=X", start=start_date, auto_adjust=True, progress=False)
+            if not fx_raw.empty:
+                usd_to_eur = (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill()
+                for t in non_eur:
+                    if t in close.columns:
+                        close[t] = close[t] * usd_to_eur
+        except Exception:
+            pass
 
-    return {"series": series, "drawdown": drawdown, "twr": twr}
+    sorted_txs = sorted(filtered, key=lambda t: t.date)
+    shares_state: dict[str, float] = defaultdict(float)
+    cost_state = 0.0
+    tx_idx = 0
+
+    twr_factor = 1.0
+    running_max_pv = 0.0
+    prev_dt = None
+
+    pv_list: list[float] = []
+    cb_list: list[float] = []
+    twr_list: list[float] = []
+    dd_list: list[float] = []
+    date_list: list[Any] = []
+
+    for dt in close.index:
+        dt_str = dt.strftime("%Y-%m-%d")
+
+        # Snapshot shares BEFORE applying today's transactions (for correct TWR)
+        shares_start = dict(shares_state)
+
+        while tx_idx < len(sorted_txs) and sorted_txs[tx_idx].date <= dt_str:
+            tx = sorted_txs[tx_idx]
+            if tx.isin in tickers_map:
+                if tx.type in ("BUY", "SAVINGS_PLAN"):
+                    shares_state[tx.isin] += abs(tx.shares)
+                    cost_state += abs(tx.amount)
+                elif tx.type == "SELL":
+                    shares_state[tx.isin] = max(0.0, shares_state[tx.isin] - abs(tx.shares))
+            tx_idx += 1
+
+        # End-of-day portfolio value (after transactions)
+        pv = 0.0
+        for isin, shares in shares_state.items():
+            if shares <= 0:
+                continue
+            ticker = tickers_map.get(isin)
+            if not ticker or ticker not in close.columns:
+                continue
+            try:
+                price = float(close.at[dt, ticker])
+                if math.isfinite(price):
+                    pv += shares * price
+            except (KeyError, ValueError, TypeError):
+                pass
+
+        # TWR: Σ(start_shares × Δprice) / Σ(start_shares × prev_price)
+        # This is zero for a day where you only bought/sold (no market movement), which is correct.
+        if prev_dt is not None and shares_start:
+            market_gain = 0.0
+            pv_start = 0.0
+            for isin, shares in shares_start.items():
+                if shares <= 0:
+                    continue
+                ticker = tickers_map.get(isin)
+                if not ticker or ticker not in close.columns:
+                    continue
+                try:
+                    p_today = float(close.at[dt, ticker])
+                    p_prev = float(close.at[prev_dt, ticker])
+                    if math.isfinite(p_today) and math.isfinite(p_prev):
+                        market_gain += shares * (p_today - p_prev)
+                        pv_start += shares * p_prev
+                except (KeyError, ValueError, TypeError):
+                    pass
+            if pv_start > 0:
+                twr_factor *= (1 + market_gain / pv_start)
+
+        twr_pct = (twr_factor - 1) * 100
+
+        # Drawdown from all-time high portfolio value
+        if pv > running_max_pv:
+            running_max_pv = pv
+        dd = (pv - running_max_pv) / running_max_pv * 100 if running_max_pv > 0 else 0.0
+
+        if pv > 0 or cost_state > 0:
+            pv_list.append(pv)
+            cb_list.append(cost_state)
+            twr_list.append(twr_pct)
+            dd_list.append(dd)
+            date_list.append(dt)
+
+        prev_dt = dt
+
+    if not pv_list:
+        return {"series": [], "drawdown": [], "twr": []}
+
+    return {
+        "series": [
+            {
+                "date": dt.strftime("%Y-%m-%d"),
+                "portfolio_value": round(float(pv), 2),
+                "contributions": round(float(cb), 2),
+                "holdings_value": round(float(pv), 2),
+            }
+            for dt, pv, cb in zip(date_list, pv_list, cb_list)
+        ],
+        "drawdown": [
+            {"date": dt.strftime("%Y-%m-%d"), "drawdown": round(float(v), 4)}
+            for dt, v in zip(date_list, dd_list)
+        ],
+        "twr": [
+            {"date": dt.strftime("%Y-%m-%d"), "twr": round(float(v), 4)}
+            for dt, v in zip(date_list, twr_list)
+        ],
+    }
