@@ -1,0 +1,14 @@
+FROM golang:1.26-alpine AS builder
+WORKDIR /app
+COPY backend/go.mod backend/go.sum ./backend/
+RUN cd backend && go mod download
+COPY backend/ ./backend/
+RUN cd backend && CGO_ENABLED=0 go build -o /kapital ./cmd/api
+
+FROM alpine:3.21
+RUN apk add --no-cache ca-certificates wget
+COPY --from=builder /kapital /kapital
+COPY certs/ /app/certs/
+WORKDIR /app
+EXPOSE 8766
+CMD ["/kapital"]

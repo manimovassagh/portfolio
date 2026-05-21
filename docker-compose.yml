@@ -2,10 +2,12 @@ services:
   pricer:
     build:
       context: .
-      dockerfile: pricer/Dockerfile
+      dockerfile: Dockerfile.pricer
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./cache:/app/cache
     restart: unless-stopped
-    expose:
-      - "8001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s
@@ -15,41 +17,39 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
-    restart: unless-stopped
-    volumes:
-      - ./exports:/app/exports      # drop your CSV exports here
-      - kapital-db:/app/db          # persists watchlist SQLite across restarts
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8766:8766"
     environment:
-      WATCHLIST_DB: db/portfolio.db
-      PRICER_URL: http://pricer:8001
-    expose:
-      - "8766"
+      - PRICER_URL=http://pricer:8001
+      - EXPORTS_DIR=/data/exports
+      - DB_PATH=/data/kapital.db
+    volumes:
+      - ./exports:/data/exports
+      - kapital-db:/data
+      - ./certs:/app/certs
+    depends_on:
+      pricer:
+        condition: service_healthy
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8766/api/readyz"]
       interval: 10s
       timeout: 5s
       retries: 3
       start_period: 15s
-    depends_on:
-      pricer:
-        condition: service_healthy
 
-  nginx:
-    build: ./nginx
-    restart: unless-stopped
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
     ports:
-      - "80:80"                     # HTTP → redirects to HTTPS
-      - "443:443"                   # HTTPS
-    volumes:
-      - ./certs:/etc/nginx/ssl:ro   # mkcert trusted certs (run setup-certs.sh first)
-    environment:
-      AUTH_USER: ""                 # set to enable HTTP Basic Auth (e.g. "admin")
-      AUTH_PASS: ""                 # password for AUTH_USER
+      - "80:80"
     depends_on:
       backend:
         condition: service_healthy
+    restart: unless-stopped
 
 volumes:
   kapital-db:

@@ -436,7 +436,7 @@ export default function App() {
                   <input type="file" accept=".csv" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0])} />
                 </label>
                 <button onClick={() => refresh()} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]">
-                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh
+                  <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span>
                 </button>
                 <button
                   onClick={() => setDark((v) => !v)}
@@ -475,19 +475,29 @@ export default function App() {
         </header>
 
         {mobileMenuOpen && (
-          <div ref={mobileMenuRef} className="fixed inset-x-0 top-[68px] z-40 border-b border-black/10 bg-white/95 backdrop-blur-xl xl:hidden dark:border-[#2b2b2b] dark:bg-[#242424]/98">
-            <nav className="mx-auto flex max-w-[1580px] flex-col gap-1 px-5 py-3 lg:px-8">
-              {sections.map(({ id, label, icon: Icon }) => (
-                <NavLink
-                  key={id}
-                  to={sectionHref(id)}
-                  className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition ${active === id ? 'bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'}`}
-                >
-                  <Icon size={17} />{label}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
+          <>
+            <div className="fixed inset-0 top-[68px] z-40 bg-black/40 backdrop-blur-sm xl:hidden" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
+            <div ref={mobileMenuRef} className="fixed inset-x-0 top-[68px] z-50 border-b border-black/10 bg-white/98 backdrop-blur-xl xl:hidden dark:border-[#2b2b2b] dark:bg-[#242424]/99">
+              <nav className="mx-auto flex max-w-[1580px] flex-col gap-1 px-5 py-3 lg:px-8">
+                {sections.map(({ id, label, icon: Icon }) => (
+                  <NavLink
+                    key={id}
+                    to={sectionHref(id)}
+                    onClick={() => setMobileMenuOpen(false)}
+                    className={`flex items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold transition ${active === id ? 'bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white' : 'text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white'}`}
+                  >
+                    <Icon size={17} />{label}
+                  </NavLink>
+                ))}
+                <div className="mt-1 border-t border-black/10 pt-2 dark:border-white/10">
+                  <label className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
+                    <Upload size={17} /> Import CSV
+                    <input type="file" accept=".csv" className="hidden" onChange={(e) => { setMobileMenuOpen(false); void handleUpload(e.target.files?.[0]); }} />
+                  </label>
+                </div>
+              </nav>
+            </div>
+          </>
         )}
 
           <div className="mx-auto max-w-[1580px] space-y-6 px-5 py-8 lg:px-8">
@@ -507,7 +517,18 @@ export default function App() {
                 <span>Last updated {(lastUpdated || new Date()).toLocaleString('en-GB', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
               </div>
             </div>
-            {error && <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-500">{error}</div>}
+            {error && (
+              <div className="flex items-start gap-3 rounded-lg border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm font-semibold text-rose-500">
+                <span className="flex-1">{error}</span>
+                <button
+                  onClick={() => setError(null)}
+                  className="shrink-0 rounded p-0.5 hover:bg-rose-500/10"
+                  aria-label="Dismiss error"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             {toast && <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-lg">{toast}</div>}
             {data && loading && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400">Refreshing dashboard data...</div>}
             {!data && loading && <SkeletonDashboard />}
