@@ -118,7 +118,9 @@ clean:
 
 cache:
 	@rm -rf cache/
-	@echo "Price cache cleared."
+	@curl -s -X POST http://localhost:$(PRICER_PORT)/cache/clear >/dev/null 2>&1 && \
+		echo "Live pricer cache cleared." || true
+	@echo "Disk cache cleared."
 
 exports:
 	@ls -lh exports/ 2>/dev/null || echo "No exports/ directory found."
