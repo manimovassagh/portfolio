@@ -85,3 +85,42 @@ def test_portfolio_analytics_rejects_bad_body():
     """A non-list value for transactions triggers a 422 Unprocessable Entity."""
     response = client.post("/portfolio_analytics", json={"transactions": "not-a-list"})
     assert response.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# 7. GET /prices — ISIN count limit
+# ---------------------------------------------------------------------------
+
+def test_prices_too_many_isins():
+    """More than 100 ISINs returns 400."""
+    isins = ",".join([f"DE{str(i).zfill(10)}" for i in range(101)])
+    response = client.get("/prices", params={"isins": isins})
+    assert response.status_code == 400
+    assert "too many ISINs" in response.json()["detail"]
+
+
+def test_prices_invalid_isin_format():
+    """Non-ISIN strings are rejected with 400."""
+    response = client.get("/prices", params={"isins": "NOT_AN_ISIN"})
+    assert response.status_code == 400
+    assert "invalid ISIN format" in response.json()["detail"]
+
+
+def test_prices_valid_isin_format():
+    """A well-formed ISIN passes format validation (may fail on price lookup)."""
+    # IE00B4L5Y983 is a valid ISIN — endpoint passes validation, fetch_prices handles the rest
+    response = client.get("/prices", params={"isins": "IE00B4L5Y983"})
+    # 200 or 503 is fine — just not 400 (no validation error)
+    assert response.status_code != 400
+
+
+# ---------------------------------------------------------------------------
+# 8. POST /portfolio_analytics — transaction count limit
+# ---------------------------------------------------------------------------
+
+def test_portfolio_analytics_too_many_transactions():
+    """More than 10000 transactions returns 400."""
+    tx = {"date": "2020-01-01", "isin": "IE00B4L5Y983", "shares": 1.0, "amount": 100.0, "type": "BUY"}
+    response = client.post("/portfolio_analytics", json={"transactions": [tx] * 10_001})
+    assert response.status_code == 400
+    assert "too many transactions" in response.json()["detail"]
