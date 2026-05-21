@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Card } from '../ui/Card';
 import { PanelTitle } from '../ui/PanelTitle';
 import { ProgressBar } from '../ui/ProgressBar';
 import { TableView } from '../TableView';
 import { fmtEUR } from '../../lib/format';
-import { fetchFsa } from '../../api';
-import type { DashboardData, ExportName, FsaData } from '../../types';
+import { useFsaQuery } from '../../lib/queries';
+import type { DashboardData, ExportName } from '../../types';
 import { AlertTriangle, ShieldCheck } from 'lucide-react';
 
 interface TaxViewProps {
@@ -14,12 +14,8 @@ interface TaxViewProps {
 }
 
 export function TaxView({ data, exportName }: TaxViewProps) {
-  const [fsa, setFsa] = useState<FsaData | null>(null);
   const [joint, setJoint] = useState(() => localStorage.getItem('fsa_joint') === 'true');
-
-  useEffect(() => {
-    fetchFsa(exportName, joint).catch(() => null).then((d) => { if (d) setFsa(d); });
-  }, [exportName, joint]);
+  const { data: fsa } = useFsaQuery(exportName, joint);
 
   const usedPct = fsa ? (fsa.used / fsa.limit) * 100 : 0;
   const isWithinAllowance = fsa ? fsa.used <= fsa.limit : true;

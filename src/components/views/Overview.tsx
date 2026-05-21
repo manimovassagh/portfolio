@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Chart from 'react-apexcharts';
 import type { ApexOptions } from 'apexcharts';
 import {
@@ -9,7 +9,8 @@ import { InfoModal } from '../ui/InfoModal';
 import { HeroChart } from '../charts/HeroChart';
 import { chartTheme, tileColor } from '../../lib/chart';
 import { fmtEUR, signedEUR, pct, rollingReturns } from '../../lib/format';
-import type { ChartMode, DashboardData, Holding, PositionRange, SectionId } from '../../types';
+import { fetchPerformance } from '../../api';
+import type { BenchmarkPoint, ChartMode, DashboardData, Holding, PositionRange, SectionId } from '../../types';
 
 type DetailView = 'unrealized' | 'income' | 'fees' | null;
 type AllocationTab = 'type' | 'positions' | 'regions' | 'sectors';
@@ -42,6 +43,25 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
   const [allocationTab, setAllocationTab] = useState<AllocationTab>('type');
   const [chartRange, setChartRange] = useState<ChartRange>('Max');
   const [positionRange, setPositionRange] = useState<PositionRangeOption>('Max');
+
+  type BenchmarkOption = { label: string; ticker: string };
+  const benchmarkOptions: BenchmarkOption[] = [
+    { label: 'None',      ticker: '' },
+    { label: 'MSCI World', ticker: 'URTH' },
+    { label: 'S&P 500',   ticker: 'CSPX.L' },
+  ];
+  const [benchmarkTicker, setBenchmarkTicker] = useState<string>('URTH');
+  const [benchmarkPoints, setBenchmarkPoints] = useState<BenchmarkPoint[] | null>(data.perf.benchmark);
+
+  useEffect(() => {
+    setBenchmarkPoints(null);
+    if (!benchmarkTicker) return;
+    let cancelled = false;
+    fetchPerformance(data.summary.export, benchmarkTicker)
+      .then((perf) => { if (!cancelled) setBenchmarkPoints(perf.benchmark); })
+      .catch(() => { if (!cancelled) setBenchmarkPoints([]); });
+    return () => { cancelled = true; };
+  }, [benchmarkTicker, data.summary.export]);
   const totalPnl = s.portfolio_value - s.net_deposits;
   const totalPnlPct = s.net_deposits ? (totalPnl / s.net_deposits) * 100 : 0;
   const allocationHoldings = useMemo(
@@ -114,8 +134,14 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
     });
     return [...rows].sort((a, b) => Math.abs(b.pnl ?? 0) - Math.abs(a.pnl ?? 0));
   }, [data.positionReturns, positionRange, sortedHoldings]);
+  const perfWithBenchmark = useMemo(() => ({
+    ...data.perf,
+    benchmark: benchmarkTicker ? (benchmarkPoints ?? null) : null,
+  }), [data.perf, benchmarkTicker, benchmarkPoints]);
+
   const chartData = useMemo(() => {
-    if (chartRange === 'Max') return data;
+    const baseData = { ...data, perf: perfWithBenchmark };
+    if (chartRange === 'Max') return baseData;
 
     const allDates = [
       ...data.perf.series.map((point) => point.date),
@@ -123,7 +149,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
       ...data.perf.drawdown.map((point) => point.date),
     ].filter(Boolean).sort();
     const lastDate = allDates.at(-1);
-    if (!lastDate) return data;
+    if (!lastDate) return baseData;
 
     const end = new Date(`${lastDate}T00:00:00`);
     const start = new Date(end);
@@ -143,18 +169,18 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
     };
 
     return {
-      ...data,
+      ...baseData,
       perf: {
-        ...data.perf,
-        series: keepWindow(data.perf.series),
-        twr: keepWindow(data.perf.twr),
-        drawdown: keepWindow(data.perf.drawdown),
-        benchmark: data.perf.benchmark
-          ? { ...data.perf.benchmark, series: keepWindow(data.perf.benchmark.series) }
+        ...perfWithBenchmark,
+        series: keepWindow(perfWithBenchmark.series),
+        twr: keepWindow(perfWithBenchmark.twr),
+        drawdown: keepWindow(perfWithBenchmark.drawdown),
+        benchmark: perfWithBenchmark.benchmark
+          ? keepWindow(perfWithBenchmark.benchmark)
           : null,
       },
     };
-  }, [chartRange, data]);
+  }, [chartRange, data, perfWithBenchmark]);
   const allocationTreemapSeries = useMemo(() => [{
     data: allocationHoldings.map((holding) => ({
       x: holding.name,
@@ -307,7 +333,21 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
               </button>
 
               <div className="min-w-0">
-                <div className="mb-3 flex justify-end gap-3">
+                <div className="mb-3 flex flex-wrap items-center justify-end gap-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-black text-slate-500">Benchmark:</span>
+                    <select
+                      value={benchmarkTicker}
+                      onChange={(e) => setBenchmarkTicker(e.target.value)}
+                      className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-slate-200 outline-none hover:bg-white/15"
+                    >
+                      {benchmarkOptions.map((opt) => (
+                        <option key={opt.ticker} value={opt.ticker} className="bg-[#303030] text-slate-200">
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   {rangeOptions.map((range) => (
                     <button
                       key={range}
@@ -318,7 +358,15 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
                     </button>
                   ))}
                 </div>
-                <HeroChart data={chartData} dark={true} mode={chartMode} height={300} showLegend={false} minimal />
+                <HeroChart
+                  data={chartData}
+                  dark={true}
+                  mode={chartMode}
+                  height={300}
+                  showLegend={false}
+                  minimal
+                  benchmarkLabel={benchmarkOptions.find((o) => o.ticker === benchmarkTicker)?.label}
+                />
               </div>
             </div>
           </div>

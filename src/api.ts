@@ -103,7 +103,14 @@ export async function listExports(): Promise<ExportName[]> {
   return payload.exports;
 }
 
-export async function loadDashboard(exportName: ExportName): Promise<DashboardData> {
+export async function fetchPerformance(exportName: ExportName, benchmark?: string): Promise<Performance> {
+  const params = new URLSearchParams({ export: exportName });
+  if (benchmark) params.set('benchmark', benchmark);
+  const raw = await getJson<unknown>(`/api/performance?${params}`);
+  return PerformanceSchema.parse(raw) as Performance;
+}
+
+export async function loadDashboard(exportName: ExportName, benchmark?: string): Promise<DashboardData> {
   const q = `?export=${encodeURIComponent(exportName)}`;
   const [exports, summary] = await Promise.all([
     listExports(),
@@ -117,7 +124,7 @@ export async function loadDashboard(exportName: ExportName): Promise<DashboardDa
       getJson<unknown>(`/api/position_returns${q}`).then((r) =>
         PositionReturnsPayloadSchema.parse(r) as { returns: PositionReturns },
       ),
-      getJson<unknown>(`/api/performance${q}`).then((r) => PerformanceSchema.parse(r) as Performance),
+      fetchPerformance(exportName, benchmark),
       getJson<unknown>(`/api/cash_flow${q}`).then((r) => CashFlowSchema.parse(r) as CashFlow),
       getJson<unknown>(`/api/income${q}`).then((r) =>
         IncomePayloadSchema.parse(r) as { log: IncomeRow[]; totals: Record<string, number> },
