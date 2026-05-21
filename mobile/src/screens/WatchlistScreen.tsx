@@ -3,21 +3,34 @@ import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, Text, T
 import { getWatchlist, removeFromWatchlist } from '../api';
 import type { WatchlistItem } from '../api';
 
+const BG = '#0f172a';
+const CARD = '#1e293b';
+const TEAL = '#45b9a8';
+const GREEN = '#10b981';
+const RED = '#ef4444';
+const TEXT = '#f8fafc';
+const MUTED = '#64748b';
+const SUB = '#94a3b8';
+const BORDER = '#334155';
+
 function fmt(n: number | null | undefined): string {
   if (n == null) return '—';
   return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function dist(item: WatchlistItem): string {
-  if (item.current_price == null || item.target_price == null || item.target_price === 0) return '';
-  const pct = ((item.current_price - item.target_price) / item.target_price) * 100;
-  return `${pct >= 0 ? '+' : ''}${pct.toFixed(1)}% from target`;
+function distPct(item: WatchlistItem): number | null {
+  if (item.current_price == null || item.target_price == null || item.target_price === 0) return null;
+  return ((item.current_price - item.target_price) / item.target_price) * 100;
 }
 
 type ItemProps = { item: WatchlistItem; onRemove: (isin: string) => void };
 function WatchlistCard({ item, onRemove }: ItemProps) {
+  const pct = distPct(item);
+  const hasTarget = item.target_price != null;
+  const aboveTarget = pct != null && pct >= 0;
+
   const handleRemove = () => {
-    Alert.alert('Remove', `Remove ${item.name || item.isin} from watchlist?`, [
+    Alert.alert('Remove from watchlist', `Remove ${item.name || item.isin}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => onRemove(item.isin) },
     ]);
@@ -25,28 +38,37 @@ function WatchlistCard({ item, onRemove }: ItemProps) {
 
   return (
     <View style={styles.card}>
-      <View style={styles.cardRow}>
+      <View style={styles.cardHeader}>
         <View style={styles.cardLeft}>
           <Text style={styles.name} numberOfLines={1}>{item.name || item.isin}</Text>
           <Text style={styles.ticker}>{item.ticker || item.isin}</Text>
         </View>
-        <TouchableOpacity onPress={handleRemove} style={styles.removeBtn}>
+        <TouchableOpacity onPress={handleRemove} style={styles.removeBtn} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={styles.removeTxt}>✕</Text>
         </TouchableOpacity>
       </View>
-      <View style={styles.prices}>
-        <View>
+
+      <View style={styles.priceRow}>
+        <View style={styles.priceBlock}>
           <Text style={styles.priceLabel}>Current</Text>
           <Text style={styles.priceValue}>€{fmt(item.current_price)}</Text>
         </View>
-        {item.target_price != null && (
-          <View>
+        {hasTarget && (
+          <View style={styles.priceBlock}>
             <Text style={styles.priceLabel}>Target</Text>
             <Text style={styles.priceValue}>€{fmt(item.target_price)}</Text>
           </View>
         )}
-        {dist(item) ? <Text style={styles.dist}>{dist(item)}</Text> : null}
+        {pct != null && (
+          <View style={[styles.distBadge, { backgroundColor: aboveTarget ? GREEN + '22' : RED + '22' }]}>
+            <Text style={[styles.distText, { color: aboveTarget ? GREEN : RED }]}>
+              {pct >= 0 ? '+' : ''}{pct.toFixed(1)}% from target
+            </Text>
+          </View>
+        )}
       </View>
+
+      {item.notes ? <Text style={styles.notes} numberOfLines={2}>{item.notes}</Text> : null}
     </View>
   );
 }
@@ -82,7 +104,7 @@ export function WatchlistScreen() {
 
   useEffect(() => { void load(); }, []);
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#45b9a8" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={TEAL} /></View>;
   if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text></View>;
 
   return (
@@ -91,27 +113,46 @@ export function WatchlistScreen() {
       data={items}
       keyExtractor={(i) => i.isin}
       renderItem={({ item }) => <WatchlistCard item={item} onRemove={handleRemove} />}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#45b9a8" />}
-      ListEmptyComponent={<View style={styles.center}><Text style={styles.empty}>Watchlist is empty</Text></View>}
-      contentContainerStyle={items.length === 0 ? { flex: 1 } : { padding: 8, paddingBottom: 24 }}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={TEAL} />}
+      ListEmptyComponent={
+        <View style={styles.center}>
+          <Text style={styles.emptyIcon}>★</Text>
+          <Text style={styles.emptyTitle}>Watchlist is empty</Text>
+          <Text style={styles.emptySub}>Add positions from the web app to track them here</Text>
+        </View>
+      }
+      contentContainerStyle={items.length === 0 ? { flex: 1 } : { padding: 12, paddingBottom: 32 }}
     />
   );
 }
 
 const styles = StyleSheet.create({
-  list: { flex: 1, backgroundColor: '#f1f5f9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  error: { color: '#ef4444', fontSize: 14, fontWeight: '600' },
-  empty: { color: '#94a3b8', fontSize: 14, fontWeight: '600' },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 14, marginHorizontal: 8, marginVertical: 5, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 6, elevation: 2 },
-  cardRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  cardLeft: { flex: 1, marginRight: 8 },
-  name: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
-  ticker: { fontSize: 11, color: '#94a3b8', fontWeight: '500', marginTop: 1 },
-  removeBtn: { padding: 4 },
-  removeTxt: { fontSize: 14, color: '#94a3b8', fontWeight: '700' },
-  prices: { flexDirection: 'row', gap: 16, marginTop: 10, alignItems: 'center' },
-  priceLabel: { fontSize: 11, color: '#94a3b8', fontWeight: '600' },
-  priceValue: { fontSize: 15, fontWeight: '800', color: '#0f172a' },
-  dist: { fontSize: 12, color: '#64748b', fontWeight: '600' },
+  list: { flex: 1, backgroundColor: BG },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG, paddingHorizontal: 32 },
+  error: { color: RED, fontSize: 14, fontWeight: '600' },
+  emptyIcon: { fontSize: 36, color: MUTED, marginBottom: 12 },
+  emptyTitle: { color: TEXT, fontSize: 17, fontWeight: '800', marginBottom: 6 },
+  emptySub: { color: MUTED, fontSize: 13, fontWeight: '500', textAlign: 'center', lineHeight: 20 },
+
+  card: {
+    backgroundColor: CARD,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 10,
+    borderWidth: 1,
+    borderColor: BORDER,
+  },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 },
+  cardLeft: { flex: 1, marginRight: 12 },
+  name: { fontSize: 16, fontWeight: '800', color: TEXT, marginBottom: 3 },
+  ticker: { fontSize: 12, color: TEAL, fontWeight: '700', letterSpacing: 0.5 },
+  removeBtn: { padding: 2 },
+  removeTxt: { fontSize: 14, color: MUTED, fontWeight: '700' },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  priceBlock: {},
+  priceLabel: { fontSize: 10, color: MUTED, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 },
+  priceValue: { fontSize: 16, fontWeight: '800', color: TEXT },
+  distBadge: { borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4, marginLeft: 'auto' as unknown as number },
+  distText: { fontSize: 12, fontWeight: '700' },
+  notes: { marginTop: 10, fontSize: 12, color: SUB, lineHeight: 18 },
 });

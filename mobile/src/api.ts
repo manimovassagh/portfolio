@@ -1,10 +1,5 @@
-// API client for the Kapital backend. Mirrors the web app's api.ts but uses
-// a configurable base URL so the mobile app can point to a local or remote backend.
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Change this to your backend URL when running on a physical device.
-// For iOS simulator / Android emulator talking to localhost, use the LAN IP.
 export const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? 'https://localhost:8766';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -89,9 +84,11 @@ async function headers(): Promise<Record<string, string>> {
   return h;
 }
 
+// credentials:'include' sends session cookies in web context (Expo web / browser)
 async function get<T>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: await headers(),
+    credentials: 'include',
   });
   if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
   return res.json() as Promise<T>;
@@ -102,6 +99,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
     method: 'POST',
     headers: await headers(),
     body: body !== undefined ? JSON.stringify(body) : undefined,
+    credentials: 'include',
   });
   if (!res.ok) {
     const err = await res.json().catch(() => null) as { error?: string } | null;
@@ -157,6 +155,7 @@ export async function removeFromWatchlist(isin: string): Promise<void> {
   const res = await fetch(`${API_BASE}/api/watchlist/${isin}`, {
     method: 'DELETE',
     headers: await headers(),
+    credentials: 'include',
   });
   if (!res.ok) throw new Error(`DELETE watchlist/${isin} → ${res.status}`);
 }

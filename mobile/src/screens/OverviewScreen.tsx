@@ -3,29 +3,37 @@ import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, View }
 import { getSummary } from '../api';
 import type { Summary } from '../api';
 
-function fmt(n: number | null | undefined, decimals = 2): string {
+const BG = '#0f172a';
+const CARD = '#1e293b';
+const HERO = '#162032';
+const TEAL = '#45b9a8';
+const GREEN = '#10b981';
+const RED = '#ef4444';
+const TEXT = '#f8fafc';
+const MUTED = '#64748b';
+const SUB = '#94a3b8';
+
+function fmt(n: number | null | undefined, dec = 2): string {
   if (n == null) return '—';
-  return n.toLocaleString('de-DE', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return n.toLocaleString('de-DE', { minimumFractionDigits: dec, maximumFractionDigits: dec });
 }
 
 function signed(n: number | null | undefined): string {
   if (n == null) return '—';
-  const s = fmt(n);
-  return n >= 0 ? `+${s}` : s;
+  return `${n >= 0 ? '+' : ''}${fmt(n)}`;
 }
 
-function pctColor(n: number | null | undefined) {
-  if (n == null) return styles.neutral;
-  return n >= 0 ? styles.green : styles.red;
+function pnlColor(n: number | null | undefined) {
+  if (n == null) return TEXT;
+  return n >= 0 ? GREEN : RED;
 }
 
-type MetricProps = { label: string; value: string; sub?: string; color?: object };
-function Metric({ label, value, sub, color }: MetricProps) {
+type MetricProps = { label: string; value: string; valueColor?: string };
+function Metric({ label, value, valueColor }: MetricProps) {
   return (
     <View style={styles.metric}>
       <Text style={styles.metricLabel}>{label}</Text>
-      <Text style={[styles.metricValue, color]}>{value}</Text>
-      {sub ? <Text style={styles.metricSub}>{sub}</Text> : null}
+      <Text style={[styles.metricValue, valueColor ? { color: valueColor } : null]}>{value}</Text>
     </View>
   );
 }
@@ -52,51 +60,82 @@ export function OverviewScreen() {
 
   useEffect(() => { void load(); }, []);
 
-  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color="#45b9a8" /></View>;
+  if (loading) return <View style={styles.center}><ActivityIndicator size="large" color={TEAL} /></View>;
   if (error) return <View style={styles.center}><Text style={styles.error}>{error}</Text></View>;
 
   const s = summary!;
+  const pct = s.unrealized_pct;
+  const pnl = s.unrealized_pnl;
+
   return (
     <ScrollView
       style={styles.scroll}
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor="#45b9a8" />}
+      contentContainerStyle={styles.content}
+      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => load(true)} tintColor={TEAL} />}
     >
+      {/* Hero */}
       <View style={styles.hero}>
         <Text style={styles.heroLabel}>Portfolio value</Text>
         <Text style={styles.heroValue}>€ {fmt(s.portfolio_value)}</Text>
-        <Text style={[styles.heroPnl, pctColor(s.unrealized_pct)]}>
-          {signed(s.unrealized_pnl)} ({signed(s.unrealized_pct)}%)
-        </Text>
+        <View style={styles.heroBadge}>
+          <Text style={[styles.heroPnl, { color: pnlColor(pnl) }]}>
+            {signed(pnl)} ({pct != null ? `${pct >= 0 ? '+' : ''}${pct.toFixed(2)}%` : '—'})
+          </Text>
+        </View>
       </View>
 
-      <View style={styles.grid}>
-        <Metric label="Market value" value={`€ ${fmt(s.market_value)}`} />
-        <Metric label="Cash" value={`€ ${fmt(s.cash_balance)}`} />
-        <Metric label="Cost basis" value={`€ ${fmt(s.cost_basis)}`} />
-        <Metric label="Realized P&L" value={`€ ${signed(s.realized_pnl)}`} color={pctColor(s.realized_pnl)} />
-        <Metric label="Total return" value={`${signed(s.total_return ? s.total_return * 100 : null)}%`} color={pctColor(s.total_return)} />
-        <Metric label="Dividends" value={`€ ${fmt(s.dividends)}`} />
-        <Metric label="Holdings" value={String(s.n_holdings)} />
-        <Metric label="XIRR" value={s.xirr != null ? `${fmt(s.xirr * 100)}%` : '—'} />
+      {/* Metrics grid */}
+      <View style={styles.section}>
+        <Text style={styles.sectionTitle}>Summary</Text>
+        <View style={styles.grid}>
+          <Metric label="Market value" value={`€ ${fmt(s.market_value)}`} />
+          <Metric label="Cash" value={`€ ${fmt(s.cash_balance)}`} />
+          <Metric label="Cost basis" value={`€ ${fmt(s.cost_basis)}`} />
+          <Metric label="Realized P&L" value={`€ ${signed(s.realized_pnl)}`} valueColor={pnlColor(s.realized_pnl)} />
+          <Metric label="Total return" value={s.total_return != null ? `${(s.total_return * 100).toFixed(2)}%` : '—'} valueColor={pnlColor(s.total_return)} />
+          <Metric label="Dividends" value={`€ ${fmt(s.dividends)}`} />
+          <Metric label="Holdings" value={String(s.n_holdings)} />
+          <Metric label="XIRR" value={s.xirr != null ? `${(s.xirr * 100).toFixed(2)}%` : '—'} valueColor={pnlColor(s.xirr)} />
+        </View>
       </View>
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: '#f1f5f9' },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  error: { color: '#ef4444', fontSize: 14, fontWeight: '600' },
-  hero: { backgroundColor: '#fff', margin: 16, borderRadius: 16, padding: 24, alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 8, elevation: 2 },
-  heroLabel: { fontSize: 13, color: '#64748b', fontWeight: '600', marginBottom: 4 },
-  heroValue: { fontSize: 36, fontWeight: '900', color: '#0f172a', marginBottom: 4 },
-  heroPnl: { fontSize: 16, fontWeight: '700' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: 8, paddingBottom: 24 },
-  metric: { width: '50%', padding: 8 },
-  metricLabel: { fontSize: 12, color: '#64748b', fontWeight: '600', marginBottom: 2 },
-  metricValue: { fontSize: 17, fontWeight: '800', color: '#0f172a' },
-  metricSub: { fontSize: 11, color: '#94a3b8', fontWeight: '500', marginTop: 1 },
-  green: { color: '#10b981' },
-  red: { color: '#ef4444' },
-  neutral: { color: '#0f172a' },
+  scroll: { flex: 1, backgroundColor: BG },
+  content: { paddingBottom: 32 },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
+  error: { color: RED, fontSize: 14, fontWeight: '600' },
+
+  hero: {
+    backgroundColor: HERO,
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderRadius: 20,
+    padding: 28,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#1e3a5f',
+  },
+  heroLabel: { fontSize: 12, color: MUTED, fontWeight: '600', letterSpacing: 1, textTransform: 'uppercase', marginBottom: 6 },
+  heroValue: { fontSize: 40, fontWeight: '900', color: TEXT, letterSpacing: -1, marginBottom: 8 },
+  heroBadge: { backgroundColor: '#0f2d20', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 4 },
+  heroPnl: { fontSize: 15, fontWeight: '700' },
+
+  section: { marginTop: 24, marginHorizontal: 16 },
+  sectionTitle: { fontSize: 11, color: MUTED, fontWeight: '700', letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: 12 },
+
+  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  metric: {
+    width: '48%',
+    flexGrow: 1,
+    backgroundColor: CARD,
+    borderRadius: 14,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  metricLabel: { fontSize: 11, color: SUB, fontWeight: '600', letterSpacing: 0.5, marginBottom: 6 },
+  metricValue: { fontSize: 18, fontWeight: '800', color: TEXT },
 });

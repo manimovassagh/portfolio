@@ -33,7 +33,8 @@ func NewToken() (string, error) {
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
 }
 
-func SetSessionCookie(c *gin.Context, token string, expiresAt time.Time, secure bool) {
+func SetSessionCookie(c *gin.Context, token string, expiresAt time.Time, _ bool) {
+	// SameSite=None requires Secure=true per spec; the backend always runs TLS so this is always safe.
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     CookieName,
 		Value:    token,
@@ -41,19 +42,19 @@ func SetSessionCookie(c *gin.Context, token string, expiresAt time.Time, secure 
 		Expires:  expiresAt,
 		MaxAge:   int(time.Until(expiresAt).Seconds()),
 		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 	})
 }
 
-func ClearSessionCookie(c *gin.Context, secure bool) {
+func ClearSessionCookie(c *gin.Context, _ bool) {
 	http.SetCookie(c.Writer, &http.Cookie{
 		Name:     CookieName,
 		Value:    "",
 		Path:     "/",
 		MaxAge:   -1,
 		HttpOnly: true,
-		Secure:   secure,
-		SameSite: http.SameSiteLaxMode,
+		Secure:   true,
+		SameSite: http.SameSiteNoneMode,
 	})
 }

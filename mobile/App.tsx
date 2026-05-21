@@ -1,11 +1,11 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
-import { getAuthSession } from './src/api';
+import { getAuthSession, devLogin } from './src/api';
 import type { AuthSession } from './src/api';
 import { LoginScreen } from './src/screens/LoginScreen';
 import { OverviewScreen } from './src/screens/OverviewScreen';
@@ -16,45 +16,52 @@ import { MarketsScreen } from './src/screens/MarketsScreen';
 const Tab = createBottomTabNavigator();
 
 const TEAL = '#45b9a8';
+const BG = '#0f172a';
+const SURFACE = '#1e293b';
+const BORDER = '#1e293b';
 
-type TabIconProps = { focused: boolean; label: string };
-function TabIcon({ focused, label }: TabIconProps) {
-  return (
-    <Text style={{ fontSize: 18, opacity: focused ? 1 : 0.45 }}>{label}</Text>
-  );
+const NavTheme = {
+  ...DarkTheme,
+  colors: { ...DarkTheme.colors, background: BG, card: SURFACE, border: BORDER },
+};
+
+type TabIconProps = { focused: boolean; label: string; color: string };
+function TabIcon({ focused, label, color }: TabIconProps) {
+  return <Text style={{ fontSize: 20, color, opacity: focused ? 1 : 0.5 }}>{label}</Text>;
 }
 
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: '#fff' },
-        headerTitleStyle: { fontWeight: '800', color: '#0f172a' },
+        headerStyle: { backgroundColor: SURFACE },
+        headerTitleStyle: { fontWeight: '800', color: '#f8fafc', fontSize: 17 },
+        headerShadowVisible: false,
+        tabBarStyle: { backgroundColor: SURFACE, borderTopColor: '#334155', borderTopWidth: 1, height: 58, paddingBottom: 8 },
         tabBarActiveTintColor: TEAL,
-        tabBarInactiveTintColor: '#94a3b8',
-        tabBarStyle: { borderTopColor: '#e2e8f0' },
-        tabBarLabelStyle: { fontSize: 11, fontWeight: '700' },
+        tabBarInactiveTintColor: '#475569',
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '700', letterSpacing: 0.3 },
       }}
     >
       <Tab.Screen
         name="Overview"
         component={OverviewScreen}
-        options={{ tabBarIcon: (p) => <TabIcon {...p} label="◎" /> }}
+        options={{ tabBarIcon: ({ focused, color }) => <TabIcon focused={focused} color={color} label="◎" /> }}
       />
       <Tab.Screen
         name="Holdings"
         component={HoldingsScreen}
-        options={{ tabBarIcon: (p) => <TabIcon {...p} label="▤" /> }}
+        options={{ tabBarIcon: ({ focused, color }) => <TabIcon focused={focused} color={color} label="▤" /> }}
       />
       <Tab.Screen
         name="Watchlist"
         component={WatchlistScreen}
-        options={{ tabBarIcon: (p) => <TabIcon {...p} label="★" /> }}
+        options={{ tabBarIcon: ({ focused, color }) => <TabIcon focused={focused} color={color} label="★" /> }}
       />
       <Tab.Screen
         name="Markets"
         component={MarketsScreen}
-        options={{ tabBarIcon: (p) => <TabIcon {...p} label="↗" /> }}
+        options={{ tabBarIcon: ({ focused, color }) => <TabIcon focused={focused} color={color} label="↗" /> }}
       />
     </Tab.Navigator>
   );
@@ -65,17 +72,25 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAuthSession()
-      .then((s) => {
-        // If auth is not required or already authenticated, go straight to main tabs.
-        // If auth IS required and not authenticated, show login.
-        if (!s.required || s.authenticated) setSession(s);
-      })
-      .catch(() => {
-        // Network error or CORS — treat as no-auth-required so app is still usable.
+    (async () => {
+      try {
+        const s = await getAuthSession();
+        if (!s.required) {
+          // Dev mode: establish a real session so auth-gated endpoints work.
+          try { await devLogin(); } catch {}
+          setSession(s);
+        } else if (s.authenticated) {
+          setSession(s);
+        }
+        // else: required + not authenticated → stay on login screen
+      } catch {
+        // Network/cert error — try dev login anyway so endpoints work.
+        try { await devLogin(); } catch {}
         setSession({ authenticated: false, required: false, user: null });
-      })
-      .finally(() => setLoading(false));
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, []);
 
   if (loading) {
@@ -88,18 +103,14 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <StatusBar style="dark" />
-      <NavigationContainer>
-        {session ? (
-          <MainTabs />
-        ) : (
-          <LoginScreen onLogin={setSession} />
-        )}
+      <StatusBar style="light" />
+      <NavigationContainer theme={NavTheme}>
+        {session ? <MainTabs /> : <LoginScreen onLogin={setSession} />}
       </NavigationContainer>
     </SafeAreaProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f1f5f9' },
+  splash: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: BG },
 });
