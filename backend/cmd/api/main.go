@@ -102,6 +102,10 @@ func main() {
 	api.POST("/refresh_prices", miscH.RefreshPrices)
 	api.POST("/upload", miscH.Upload)
 
+	// Docs (outside /api group — no auth required)
+	r.GET("/docs", coreH.DocsUI)
+	r.GET("/docs/openapi.yaml", coreH.DocsSpec)
+
 	addr := ":" + cfg.Port
 	_, certErr := os.Stat(cfg.TLSCert)
 	_, keyErr := os.Stat(cfg.TLSKey)
