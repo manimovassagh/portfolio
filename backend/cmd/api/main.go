@@ -71,12 +71,12 @@ func main() {
 
 	// Financial reports
 	api.GET("/position_returns", miscH.PositionReturns)
-	api.GET("/performance", miscH.Performance)
+	api.GET("/performance", middleware.RateLimit(10, 5), miscH.Performance)
 	api.GET("/cash_flow", cashFlowH.Get)
 	api.GET("/income", incomeH.Get)
 	api.GET("/realized", realizedH.Get)
 	api.GET("/tax", taxH.Get)
-	api.GET("/analytics", analyticsH.Get)
+	api.GET("/analytics", middleware.RateLimit(10, 5), analyticsH.Get)
 
 	// Geographic & German tax
 	api.GET("/geographic", miscH.Geographic)
@@ -92,10 +92,10 @@ func main() {
 	persisted.DELETE("/watchlist/:isin", watchlistH.Remove)
 
 	// Market data (proxied to Python pricer)
-	api.GET("/market/search", marketH.Search)
-	api.GET("/market/quote", marketH.Quote)
-	api.GET("/market/history", marketH.History)
-	api.GET("/market/news", marketH.News)
+	api.GET("/market/search",  middleware.RateLimit(5, 3), marketH.Search)
+	api.GET("/market/quote",   middleware.RateLimit(5, 3), marketH.Quote)
+	api.GET("/market/history", middleware.RateLimit(5, 3), marketH.History)
+	api.GET("/market/news",    middleware.RateLimit(5, 3), marketH.News)
 
 	// Actions
 	api.POST("/refresh_prices", miscH.RefreshPrices)
