@@ -1,6 +1,7 @@
 package service_test
 
 import (
+	"math"
 	"testing"
 
 	"github.com/manimovassagh/portfolio/internal/model"
@@ -20,18 +21,59 @@ func TestComputeHoldings_BuyOnly(t *testing.T) {
 	if h.Shares != 2.0 {
 		t.Errorf("expected shares 2.0, got %f", h.Shares)
 	}
-	if h.CostBasis != 200.0 {
-		t.Errorf("expected cost_basis 200.0 (abs(amount), matches Python), got %f", h.CostBasis)
+	// Fee is capitalized into cost basis: 200 (amount) + 1 (fee) = 201
+	if h.CostBasis != 201.0 {
+		t.Errorf("expected cost_basis 201.0 (amount + capitalized fee), got %f", h.CostBasis)
 	}
-	if h.AvgCost != 100.0 {
-		t.Errorf("expected avg_cost 100.0, got %f", h.AvgCost)
+	if h.AvgCost != 100.5 {
+		t.Errorf("expected avg_cost 100.5, got %f", h.AvgCost)
 	}
 	if h.FeesPaid != 1.0 {
-		t.Errorf("expected fees 1.0, got %f", h.FeesPaid)
+		t.Errorf("expected fees_paid 1.0, got %f", h.FeesPaid)
+	}
+}
+
+func TestComputeHoldings_FeeCapitalizedIntoCostBasis(t *testing.T) {
+	// BUY 10 shares @ €50 with €2 fee → cost basis = 502, avg_cost = 50.20
+	txs := []model.Transaction{
+		{Category: "TRADING", Type: "BUY", ISIN: "ETF01", Name: "ETF",
+			AssetClass: "FUND", Shares: 10.0, Price: 50.0, Amount: -500.0, Fee: -2.0},
+	}
+	holdings := service.ComputeHoldings(txs)
+	h := holdings["ETF01"]
+	if h.CostBasis != 502.0 {
+		t.Errorf("expected cost_basis 502.0, got %f", h.CostBasis)
+	}
+	if math.Abs(h.AvgCost-50.2) > 1e-9 {
+		t.Errorf("expected avg_cost 50.20, got %f", h.AvgCost)
+	}
+}
+
+func TestComputeHoldings_FeeCapitalized_RealizePnL(t *testing.T) {
+	// BUY 2 shares @ €100 + €1 fee → avg_cost 100.5
+	// SELL 2 shares @ €110 → P&L = (110 - 100.5) × 2 = 19.0
+	txs := []model.Transaction{
+		{Category: "TRADING", Type: "BUY", ISIN: "ETF01", Name: "ETF",
+			AssetClass: "FUND", Shares: 2.0, Price: 100.0, Amount: -200.0, Fee: -1.0},
+		{Category: "TRADING", Type: "SELL", ISIN: "ETF01", Name: "ETF",
+			AssetClass: "FUND", Shares: -2.0, Price: 110.0, Amount: 220.0},
+	}
+	_, realized := service.ComputeHoldingsAndRealized(txs)
+	if len(realized) != 1 {
+		t.Fatalf("expected 1 realized entry, got %d", len(realized))
+	}
+	r := realized[0]
+	if math.Abs(r.AvgCost-100.5) > 1e-9 {
+		t.Errorf("expected avg_cost 100.5 (fee capitalized), got %f", r.AvgCost)
+	}
+	if math.Abs(r.PnL-19.0) > 1e-9 {
+		t.Errorf("expected realized P&L 19.0, got %f", r.PnL)
 	}
 }
 
 func TestComputeHoldings_BuySell(t *testing.T) {
+	// BUY 4 shares @ €100, no fee → cost basis 400, avg_cost 100
+	// SELL 2 shares → remaining cost basis = 400 - (100 × 2) = 200
 	txs := []model.Transaction{
 		{Category: "TRADING", Type: "BUY", ISIN: "TEST01", Name: "Test ETF",
 			AssetClass: "FUND", Shares: 4.0, Price: 100.0, Amount: -400.0},

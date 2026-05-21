@@ -46,8 +46,9 @@ func ComputeHoldingsAndRealized(txs []model.Transaction) (map[string]model.Holdi
 		h.FeesPaid += fee
 
 		if buyTypes[typ] {
-			// Cost basis includes the fee (matches Python: cost_basis += abs(amount))
-			h.CostBasis += math.Abs(tx.Amount)
+			// Capitalize acquisition fees into cost basis (GAAP/IFRS treatment).
+			// avg_cost = (amount + fee) / shares so P&L reflects total acquisition cost.
+			h.CostBasis += math.Abs(tx.Amount) + fee
 			h.Shares += shares
 		} else if sellTypes[typ] {
 			avgCost := 0.0
