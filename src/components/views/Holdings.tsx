@@ -1,3 +1,4 @@
+import { Download } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { PanelHeader } from '../ui/PanelTitle';
 import { fmtEUR, signedEUR, pct } from '../../lib/format';
@@ -11,9 +12,25 @@ interface HoldingsViewProps {
 export function HoldingsView({ data, openAsset }: HoldingsViewProps) {
   const hasConcentrated = data.holdings.some((h) => h.weight > 20);
 
+  const handleExport = () => {
+    const selectedExport = localStorage.getItem('selectedExport') || '';
+    const exportParam = selectedExport ? `?export=${selectedExport}` : '';
+    window.location.href = `/api/holdings/export${exportParam}`;
+  };
+
   return (
     <section className="space-y-4">
-      <PanelHeader title="Holdings" subtitle={`${data.holdings.length} open positions · ${fmtEUR(data.totalMV)} market value`} />
+      <div className="flex items-center justify-between">
+        <PanelHeader title="Holdings" subtitle={`${data.holdings.length} open positions · ${fmtEUR(data.totalMV)} market value`} />
+        <button
+          type="button"
+          onClick={handleExport}
+          className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+        >
+          <Download className="h-4 w-4" />
+          Export CSV
+        </button>
+      </div>
       {hasConcentrated && (
         <div className="flex items-center gap-2 rounded-lg border border-amber-500/20 bg-amber-500/10 px-4 py-2.5 text-sm font-semibold text-amber-600 dark:text-amber-400">
           <span className="inline-block h-2 w-2 rounded-full bg-amber-500" />

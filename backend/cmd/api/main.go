@@ -64,6 +64,7 @@ func main() {
 
 	// Holdings
 	api.GET("/holdings", holdingsH.List)
+	api.GET("/holdings/export", holdingsH.Export)
 	api.GET("/holdings/:isin", holdingsH.Detail)
 
 	// Asset detail (different shape: current.unrealized vs current.unrealized_pnl)
