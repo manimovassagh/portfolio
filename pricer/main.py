@@ -14,6 +14,7 @@ import yfinance as yf
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
+from .hist_cache import download_cached
 from .prices import fetch_prices, resolve_tickers
 
 logger = logging.getLogger(__name__)
@@ -33,6 +34,13 @@ def get_prices(isins: str = Query(..., description="Comma-separated ISIN list"))
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.post("/cache/clear")
+def cache_clear() -> dict[str, Any]:
+    from .hist_cache import clear_hist_cache
+    deleted = clear_hist_cache()
+    return {"deleted": deleted}
 
 
 @app.get("/search")
@@ -212,10 +220,10 @@ def _compute_portfolio_series(
 
     try:
         if len(tickers) == 1:
-            raw = yf.download(tickers[0], start=start_date, auto_adjust=True, progress=False)
+            raw = download_cached(tickers[0], start=start_date)
             close = pd.DataFrame({tickers[0]: raw["Close"]})
         else:
-            raw = yf.download(tickers, start=start_date, auto_adjust=True, progress=False)
+            raw = download_cached(tickers, start=start_date)
             close = raw["Close"]
         close = close.ffill()
     except Exception as exc:
@@ -226,7 +234,7 @@ def _compute_portfolio_series(
     non_eur = [t for t in tickers if not _is_eur_ticker(t)]
     if non_eur:
         try:
-            fx_raw = yf.download("EURUSD=X", start=start_date, auto_adjust=True, progress=False)
+            fx_raw = download_cached("EURUSD=X", start=start_date, label="fx")
             if not fx_raw.empty:
                 usd_to_eur = (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill()
                 for t in non_eur:
@@ -386,10 +394,10 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
 
     try:
         if len(tickers) == 1:
-            raw = yf.download(tickers[0], start=start_date, auto_adjust=True, progress=False)
+            raw = download_cached(tickers[0], start=start_date)
             close = pd.DataFrame({tickers[0]: raw["Close"]})
         else:
-            raw = yf.download(tickers, start=start_date, auto_adjust=True, progress=False)
+            raw = download_cached(tickers, start=start_date)
             close = raw["Close"]
         close = close.ffill()
     except Exception as exc:
@@ -399,7 +407,7 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
     non_eur = [t for t in tickers if not _is_eur_ticker(t)]
     if non_eur:
         try:
-            fx_raw = yf.download("EURUSD=X", start=start_date, auto_adjust=True, progress=False)
+            fx_raw = download_cached("EURUSD=X", start=start_date, label="fx")
             if not fx_raw.empty:
                 usd_to_eur = (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill()
                 for t in non_eur:
@@ -499,7 +507,7 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
     benchmark_series: list[dict[str, Any]] = []
     try:
         bm_ticker = req.benchmark.strip() if req.benchmark else "URTH"
-        bm_raw = yf.download(bm_ticker, start=start_date, auto_adjust=True, progress=False)
+        bm_raw = download_cached(bm_ticker, start=start_date, label=bm_ticker)
         if bm_raw is not None and not bm_raw.empty:
             bm_close = bm_raw["Close"].ffill()
             # Filter to dates present in our date_list range
