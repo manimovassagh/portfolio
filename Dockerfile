@@ -8,7 +8,7 @@ COPY src ./src
 RUN npm run build
 
 # Stage 2: Python runtime
-FROM python:3.12-slim
+FROM python:3.14-slim
 WORKDIR /app
 RUN pip install uv --no-cache-dir
 COPY pyproject.toml uv.lock ./
