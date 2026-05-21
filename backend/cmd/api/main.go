@@ -30,8 +30,11 @@ func main() {
 	r.Use(middleware.CORS())
 	r.Use(middleware.Logger())
 
+	coreH := handler.NewCoreHandler(cfg)
+
 	api := r.Group("/api")
-	api.GET("/health", func(c *gin.Context) { c.JSON(200, gin.H{"status": "ok"}) })
+	api.GET("/health", coreH.Health)
+	api.GET("/exports", coreH.Exports)
 	api.GET("/holdings", holdingsH.List)
 	api.GET("/holdings/:isin", holdingsH.Detail)
 	api.GET("/portfolio", portfolioH.Overview)

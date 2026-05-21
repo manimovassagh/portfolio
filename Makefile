@@ -1,4 +1,4 @@
-.PHONY: run dev stop certs frontend build-frontend start-backend start-backend-dev run-pricer docker docker-down docker-logs typecheck install clean cache exports help
+.PHONY: run dev stop certs frontend build-frontend start-backend start-backend-dev run-pricer run-go run-all docker docker-down docker-logs typecheck install clean cache exports help
 
 .DEFAULT_GOAL := help
 
@@ -62,6 +62,15 @@ start-backend-dev:
 run-pricer:
 	$(UV) run uvicorn pricer.main:app --host 0.0.0.0 --port 8001
 
+run-go:
+	cd backend && go run ./cmd/api
+
+run-all:
+	@trap 'kill 0' INT; \
+	$(MAKE) run-pricer & \
+	$(MAKE) run-go & \
+	npm run dev
+
 docker: certs
 	docker compose up --build
 
@@ -105,6 +114,8 @@ help:
 	@echo "  start-backend      Start FastAPI backend only"
 	@echo "  start-backend-dev  Start FastAPI backend only with reload"
 	@echo "  run-pricer         Start pricer microservice on port 8001"
+	@echo "  run-go             Start Go backend on port 8766"
+	@echo "  run-all            Start pricer + Go backend + Vite dev server"
 	@echo "  typecheck          Type-check TypeScript frontend"
 	@echo "  install            Install backend and frontend dependencies"
 	@echo "  clean              Remove __pycache__ and .pyc files"
