@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import { Card } from './ui/Card';
 import { MiniStat } from './ui/MiniStat';
@@ -16,6 +16,12 @@ interface AssetModalProps {
 export function AssetModal({ asset, onClose }: AssetModalProps) {
   const [detailed, setDetailed] = useState(false);
   const [notes, setNotes] = useState(() => localStorage.getItem(`notes_${asset.isin}`) || '');
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
+    document.addEventListener('keydown', handler);
+    return () => document.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   return (
     <div

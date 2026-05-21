@@ -402,7 +402,9 @@ export default function App() {
                 <button
                   className="inline-flex h-10 items-center rounded-md border border-slate-200 bg-white px-3 text-slate-700 shadow-sm hover:bg-slate-50 xl:hidden dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
                   onClick={() => setMobileMenuOpen((v) => !v)}
-                  aria-label="Open navigation"
+                  aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                  aria-expanded={mobileMenuOpen}
+                  aria-controls="mobile-nav"
                 >
                   {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
                 </button>
@@ -477,8 +479,8 @@ export default function App() {
         {mobileMenuOpen && (
           <>
             <div className="fixed inset-0 top-[68px] z-40 bg-black/40 backdrop-blur-sm xl:hidden" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
-            <div ref={mobileMenuRef} className="fixed inset-x-0 top-[68px] z-50 border-b border-black/10 bg-white/98 backdrop-blur-xl xl:hidden dark:border-[#2b2b2b] dark:bg-[#242424]/99">
-              <nav className="mx-auto flex max-w-[1580px] flex-col gap-1 px-5 py-3 lg:px-8">
+            <div id="mobile-nav" ref={mobileMenuRef} className="fixed inset-x-0 top-[68px] z-50 border-b border-black/10 bg-white/98 backdrop-blur-xl xl:hidden dark:border-[#2b2b2b] dark:bg-[#242424]/99">
+              <nav className="mx-auto flex max-w-[1580px] flex-col gap-1 px-5 py-3 lg:px-8" aria-label="Mobile navigation">
                 {sections.map(({ id, label, icon: Icon }) => (
                   <NavLink
                     key={id}

@@ -143,7 +143,7 @@ export function WatchlistView({ exportName: _exportName }: { exportName: ExportN
                         <span className="rounded-md bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600 dark:bg-slate-800 dark:text-slate-300">{item.ticker}</span>
                       )}
                     </div>
-                    <button onClick={() => handleDelete(item.isin)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-500" title="Remove">
+                    <button onClick={() => handleDelete(item.isin)} className="shrink-0 rounded p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-500" aria-label={`Remove ${item.name} from watchlist`}>
                       <X size={15} />
                     </button>
                   </div>
