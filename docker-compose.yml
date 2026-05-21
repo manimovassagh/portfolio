@@ -1,26 +1,41 @@
 services:
-  app:
-    build: .
-    restart: unless-stopped
-    volumes:
-      - ./exports:/app/exports      # drop your CSV exports here
-      - kapital-db:/app/db          # persists watchlist SQLite across restarts
-    environment:
-      WATCHLIST_DB: db/portfolio.db
-
-  nginx:
-    build: ./nginx
-    restart: unless-stopped
+  pricer:
+    build:
+      context: .
+      dockerfile: Dockerfile.pricer
     ports:
-      - "80:80"                     # HTTP → redirects to HTTPS
-      - "443:443"                   # HTTPS
+      - "8001:8001"
     volumes:
-      - ./certs:/etc/nginx/ssl:ro   # mkcert trusted certs (run setup-certs.sh first)
+      - ./cache:/app/cache
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8766:8766"
     environment:
-      AUTH_USER: ""                 # set to enable HTTP Basic Auth (e.g. "admin")
-      AUTH_PASS: ""                 # password for AUTH_USER
+      - PRICER_URL=http://pricer:8001
+      - EXPORTS_DIR=/data/exports
+      - DB_PATH=/data/kapital.db
+    volumes:
+      - ./exports:/data/exports
+      - kapital-db:/data
+      - ./certs:/app/certs
     depends_on:
-      - app
+      - pricer
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
 
 volumes:
   kapital-db:
