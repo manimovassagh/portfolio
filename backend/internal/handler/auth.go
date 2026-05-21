@@ -43,7 +43,7 @@ func (h *AuthHandler) Providers(c *gin.Context) {
 		"providers": gin.H{
 			"google":  os.Getenv("GOOGLE_CLIENT_ID") != "",
 			"apple":   os.Getenv("APPLE_CLIENT_ID") != "",
-			"passkey": h.cfg.AuthRequired,
+			"passkey": true,
 		},
 	})
 }

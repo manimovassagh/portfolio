@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Apple, Fingerprint, KeyRound, Loader2, ShieldCheck } from 'lucide-react';
-import { getAuthProviders, loginInDevMode, loginWithApple, loginWithGoogle, loginWithPasskey } from '../api';
+import { Apple, Fingerprint, KeyRound, Loader2, ShieldCheck, UserPlus } from 'lucide-react';
+import { getAuthProviders, loginInDevMode, loginWithApple, loginWithGoogle, loginWithPasskey, registerPasskey } from '../api';
 import type { AuthProviders, AuthSession } from '../types';
 
-type Provider = 'google' | 'apple' | 'passkey' | 'dev';
+type Provider = 'google' | 'apple' | 'passkey' | 'passkey-register' | 'dev';
 
 export function AuthScreen({
   onAuthenticated,
@@ -15,6 +15,7 @@ export function AuthScreen({
   const [providers, setProviders] = useState<AuthProviders['providers'] | null>(null);
   const [pending, setPending] = useState<Provider | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [username, setUsername] = useState('');
 
   useEffect(() => {
     getAuthProviders()
@@ -23,6 +24,10 @@ export function AuthScreen({
   }, []);
 
   const run = async (provider: Provider) => {
+    if (provider === 'passkey-register' && !username.trim()) {
+      setError('Enter a username to register a passkey');
+      return;
+    }
     setPending(provider);
     setError(null);
     try {
@@ -32,7 +37,9 @@ export function AuthScreen({
           ? await loginWithApple()
           : provider === 'passkey'
             ? await loginWithPasskey()
-            : await loginInDevMode();
+            : provider === 'passkey-register'
+              ? await registerPasskey(username.trim())
+              : await loginInDevMode();
       onAuthenticated(session);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-in failed');
@@ -66,14 +73,33 @@ export function AuthScreen({
           </button>
           <button className={buttonClass} disabled={!providers?.passkey || pending !== null} onClick={() => run('passkey')}>
             {pending === 'passkey' ? <Loader2 size={17} className="animate-spin" /> : <Fingerprint size={17} />}
-            Continue with passkey
+            Sign in with passkey
           </button>
         </div>
 
-        {providers && !providers.google && !providers.apple && !providers.passkey && (
-          <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-2 text-sm font-semibold text-amber-700 dark:text-amber-300">
-            Passwordless providers are not configured yet. Use local dev mode for now.
-          </div>
+        {providers?.passkey && (
+          <details className="mt-4 rounded-lg border border-slate-200 dark:border-[#3a3a3a]">
+            <summary className="cursor-pointer px-3 py-2 text-sm font-semibold text-slate-500 hover:text-slate-900 dark:hover:text-slate-100">
+              <UserPlus size={14} className="inline mr-1.5" />Register new passkey
+            </summary>
+            <div className="flex gap-2 px-3 pb-3 pt-2">
+              <input
+                type="text"
+                placeholder="Choose a username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="flex-1 rounded-md border border-slate-200 bg-white px-3 py-2 text-sm dark:border-[#3a3a3a] dark:bg-[#1a1a1a] dark:text-slate-100"
+                disabled={pending !== null}
+              />
+              <button
+                className="rounded-md bg-[#45b9a8] px-3 py-2 text-sm font-black text-white hover:bg-[#3aa999] disabled:opacity-60"
+                disabled={pending !== null || !username.trim()}
+                onClick={() => run('passkey-register')}
+              >
+                {pending === 'passkey-register' ? <Loader2 size={15} className="animate-spin" /> : 'Register'}
+              </button>
+            </div>
+          </details>
         )}
 
         <button

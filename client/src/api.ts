@@ -83,9 +83,107 @@ export async function loginWithApple(): Promise<AuthSession> {
   return AuthSessionSchema.parse(raw) as AuthSession;
 }
 
+// Helpers to convert between base64url strings and ArrayBuffers (WebAuthn requires ArrayBuffers).
+function b64urlToBuffer(b64: string): ArrayBuffer {
+  const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+  const buf = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return buf.buffer;
+}
+function bufferToB64url(buf: ArrayBuffer): string {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+}
+
+export async function registerPasskey(username: string): Promise<AuthSession> {
+  // Step 1: begin — get challenge options from server.
+  const begin = await fetch('/api/auth/passkey/register/begin', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username }),
+  });
+  if (!begin.ok) throw new Error('Passkey registration begin failed');
+  const { session_id, options } = await begin.json() as { session_id: string; options: { publicKey: Record<string, unknown> } };
+
+  // Decode base64url fields to ArrayBuffers for the browser WebAuthn API.
+  const pk = options.publicKey;
+  pk.challenge = b64urlToBuffer(pk.challenge as string);
+  pk.user = { ...(pk.user as Record<string, unknown>), id: b64urlToBuffer((pk.user as { id: string }).id) };
+  if (Array.isArray(pk.excludeCredentials)) {
+    pk.excludeCredentials = (pk.excludeCredentials as Array<{ id: string }>).map((c) => ({ ...c, id: b64urlToBuffer(c.id) }));
+  }
+
+  // Step 2: create credential in browser.
+  const credential = await navigator.credentials.create({ publicKey: pk as PublicKeyCredentialCreationOptions });
+  if (!credential) throw new Error('Credential creation was cancelled');
+  const pkc = credential as PublicKeyCredential;
+  const resp = pkc.response as AuthenticatorAttestationResponse;
+
+  // Encode response for the server.
+  const encoded = {
+    id: pkc.id, rawId: bufferToB64url(pkc.rawId),
+    type: pkc.type,
+    response: {
+      clientDataJSON: bufferToB64url(resp.clientDataJSON),
+      attestationObject: bufferToB64url(resp.attestationObject),
+    },
+  };
+
+  // Step 3: finish — send attestation to server.
+  const finish = await fetch('/api/auth/passkey/register/finish', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Session-Id': session_id, 'X-Username': username },
+    body: JSON.stringify(encoded),
+  });
+  if (!finish.ok) {
+    const err = await finish.json().catch(() => null) as { error?: string } | null;
+    throw new Error(err?.error || 'Passkey registration finish failed');
+  }
+  return AuthSessionSchema.parse(await finish.json()) as AuthSession;
+}
+
 export async function loginWithPasskey(): Promise<AuthSession> {
-  const raw = await postJson<unknown>('/api/auth/passkey/begin');
-  return AuthSessionSchema.parse(raw) as AuthSession;
+  // Step 1: begin — get assertion challenge from server.
+  const begin = await fetch('/api/auth/passkey/login/begin', {
+    method: 'POST', credentials: 'same-origin',
+  });
+  if (!begin.ok) throw new Error('Passkey login begin failed');
+  const { session_id, options } = await begin.json() as { session_id: string; options: { publicKey: Record<string, unknown> } };
+
+  // Decode challenge.
+  const pk = options.publicKey;
+  pk.challenge = b64urlToBuffer(pk.challenge as string);
+  if (Array.isArray(pk.allowCredentials)) {
+    pk.allowCredentials = (pk.allowCredentials as Array<{ id: string }>).map((c) => ({ ...c, id: b64urlToBuffer(c.id) }));
+  }
+
+  // Step 2: get assertion from browser.
+  const credential = await navigator.credentials.get({ publicKey: pk as PublicKeyCredentialRequestOptions });
+  if (!credential) throw new Error('Authentication was cancelled');
+  const pkc = credential as PublicKeyCredential;
+  const resp = pkc.response as AuthenticatorAssertionResponse;
+
+  const encoded = {
+    id: pkc.id, rawId: bufferToB64url(pkc.rawId),
+    type: pkc.type,
+    response: {
+      clientDataJSON: bufferToB64url(resp.clientDataJSON),
+      authenticatorData: bufferToB64url(resp.authenticatorData),
+      signature: bufferToB64url(resp.signature),
+      userHandle: resp.userHandle ? bufferToB64url(resp.userHandle) : null,
+    },
+  };
+
+  // Step 3: finish — verify assertion.
+  const finish = await fetch('/api/auth/passkey/login/finish', {
+    method: 'POST', credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json', 'X-Session-Id': session_id },
+    body: JSON.stringify(encoded),
+  });
+  if (!finish.ok) {
+    const err = await finish.json().catch(() => null) as { error?: string } | null;
+    throw new Error(err?.error || 'Passkey login failed');
+  }
+  return AuthSessionSchema.parse(await finish.json()) as AuthSession;
 }
 
 export async function loginInDevMode(): Promise<AuthSession> {
