@@ -188,9 +188,9 @@ func (h *MiscHandler) FSA(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{
-		"year":  year,
-		"limit": limit,
-		"used":  used,
+		"year":      year,
+		"limit":     limit,
+		"used":      used,
 		"remaining": remaining,
 		"breakdown": gin.H{
 			"dividends":      cash.Dividends,
@@ -259,7 +259,7 @@ func (h *MiscHandler) Upload(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	name := filepath.Base(header.Filename)
 	if !strings.HasSuffix(strings.ToLower(name), ".csv") {

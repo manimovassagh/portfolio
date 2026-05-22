@@ -38,7 +38,7 @@ func (h *MarketHandler) pricerGet(path string, params url.Values) (any, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("pricer returned %d", resp.StatusCode)
 	}

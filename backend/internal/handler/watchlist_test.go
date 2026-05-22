@@ -16,7 +16,7 @@ func TestWatchlistRejectsMissingISIN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	h := NewWatchlistHandler(store, nil)
 	r := gin.New()
@@ -38,7 +38,7 @@ func TestWatchlistRejectsInvalidISIN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	h := NewWatchlistHandler(store, nil)
 	r := gin.New()
@@ -60,7 +60,7 @@ func TestWatchlistNormalizesTickerAndISIN(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	h := NewWatchlistHandler(store, nil)
 	r := gin.New()

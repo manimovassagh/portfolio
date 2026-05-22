@@ -27,7 +27,7 @@ func (c *Client) Health() error {
 	if err != nil {
 		return fmt.Errorf("pricer unreachable: %w", err)
 	}
-	resp.Body.Close()
+	_ = resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("pricer returned %d", resp.StatusCode)
 	}
@@ -45,7 +45,7 @@ func (c *Client) GetPrices(isins []string) (map[string]float64, error) {
 	if err != nil {
 		return nil, fmt.Errorf("pricer unreachable: %w", err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
 		return nil, fmt.Errorf("pricer returned %d", resp.StatusCode)
@@ -102,7 +102,7 @@ func (c *Client) postJSON(path string, payload any, out any) error {
 	if err != nil {
 		return fmt.Errorf("pricer %s unreachable: %w", path, err)
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("pricer %s returned %d", path, resp.StatusCode)
 	}

@@ -39,7 +39,7 @@ func (h *PricesWSHandler) Stream(c *gin.Context) {
 	if err != nil {
 		return
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 
 	isins := h.resolveISINs(c)
 	if len(isins) == 0 {

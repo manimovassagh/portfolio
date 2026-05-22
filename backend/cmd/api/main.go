@@ -19,7 +19,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("db: %v", err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	pricerClient := pricer.New(cfg.PricerURL)
 
@@ -102,10 +102,10 @@ func main() {
 	persisted.DELETE("/watchlist/:isin", watchlistH.Remove)
 
 	// Market data (proxied to Python pricer)
-	api.GET("/market/search",  middleware.RateLimit(5, 3), marketH.Search)
-	api.GET("/market/quote",   middleware.RateLimit(5, 3), marketH.Quote)
+	api.GET("/market/search", middleware.RateLimit(5, 3), marketH.Search)
+	api.GET("/market/quote", middleware.RateLimit(5, 3), marketH.Quote)
 	api.GET("/market/history", middleware.RateLimit(5, 3), marketH.History)
-	api.GET("/market/news",    middleware.RateLimit(5, 3), marketH.News)
+	api.GET("/market/news", middleware.RateLimit(5, 3), marketH.News)
 
 	// WebSocket live prices
 	api.GET("/ws/prices", pricesWSH.Stream)
@@ -133,4 +133,3 @@ func main() {
 		}
 	}
 }
-

@@ -12,7 +12,7 @@ func TestWatchlistCRUD(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	item := model.WatchlistItem{
 		ISIN:      "TEST123",

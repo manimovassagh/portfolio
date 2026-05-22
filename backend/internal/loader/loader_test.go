@@ -20,7 +20,9 @@ func writeCSV(t *testing.T, content string) string {
 	if _, err := f.WriteString(content); err != nil {
 		t.Fatal(err)
 	}
-	f.Close()
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 	return f.Name()
 }
 
@@ -31,7 +33,7 @@ func TestLoad(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer os.Remove(f.Name())
+	defer func() { _ = os.Remove(f.Name()) }()
 
 	if _, err := f.WriteString(`"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
 "2025-04-03T11:26:34.643Z","2025-04-03","DEFAULT","TRADING","BUY","FUND","World ETF","IE000TEST01","1.5","100.0","-150.0","-1.0","","EUR","","","","Buy","tx1","","","",""
@@ -83,7 +85,7 @@ func TestLoad_ValidCSV(t *testing.T) {
 	content := csvHeader +
 		"2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,10,80.50,805.00,0.99,0.00,\n"
 	path := writeCSV(t, content)
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	txs, err := loader.Load(path)
 	if err != nil {
@@ -116,7 +118,7 @@ func TestLoad_EmptyNumericField(t *testing.T) {
 	content := csvHeader +
 		"2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,,80.50,805.00,0.99,0.00,\n"
 	path := writeCSV(t, content)
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	txs, err := loader.Load(path)
 	if err != nil {
@@ -137,7 +139,7 @@ func TestLoad_MalformedNumericField(t *testing.T) {
 	content := csvHeader +
 		"2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,abc,80.50,805.00,0.99,0.00,\n"
 	path := writeCSV(t, content)
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	txs, err := loader.Load(path)
 	if txs != nil {
@@ -201,7 +203,7 @@ func TestLoad_MultipleErrors(t *testing.T) {
 		"2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,abc,80.50,805.00,0.99,0.00,\n" +
 		"2024-02-01T09:00:00,2024-02-01,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,5,80.50,N/A,0.99,0.00,\n"
 	path := writeCSV(t, content)
-	defer os.Remove(path)
+	defer func() { _ = os.Remove(path) }()
 
 	txs, err := loader.Load(path)
 	if txs != nil {

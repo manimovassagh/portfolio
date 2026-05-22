@@ -30,7 +30,7 @@ func Open(path string) (*Store, error) {
 	return s, nil
 }
 
-func (s *Store) Close() { s.db.Close() }
+func (s *Store) Close() error { return s.db.Close() }
 
 func (s *Store) Ping() error { return s.db.Ping() }
 
@@ -75,7 +75,7 @@ func (s *Store) GetWatchlist() ([]model.WatchlistItem, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var items []model.WatchlistItem
 	for rows.Next() {
@@ -209,7 +209,7 @@ func (s *Store) GetPasskeyCredentials(userID string) ([]PasskeyCredRow, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []PasskeyCredRow
 	for rows.Next() {
 		var c PasskeyCredRow

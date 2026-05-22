@@ -3,7 +3,6 @@ package middleware
 import (
 	"net/http"
 	"net/http/httptest"
-	"os"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -11,7 +10,7 @@ import (
 
 func TestCORSAllowsKnownOrigin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	os.Setenv("CORS_ORIGINS", "http://localhost:5173")
+	t.Setenv("CORS_ORIGINS", "http://localhost:5173")
 	r := gin.New()
 	r.Use(CORS())
 	r.GET("/test", func(c *gin.Context) { c.Status(http.StatusOK) })
@@ -28,7 +27,7 @@ func TestCORSAllowsKnownOrigin(t *testing.T) {
 
 func TestCORSBlocksUnknownOrigin(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	os.Setenv("CORS_ORIGINS", "http://localhost:5173")
+	t.Setenv("CORS_ORIGINS", "http://localhost:5173")
 	r := gin.New()
 	r.Use(CORS())
 	r.GET("/test", func(c *gin.Context) { c.Status(http.StatusOK) })
@@ -45,7 +44,7 @@ func TestCORSBlocksUnknownOrigin(t *testing.T) {
 
 func TestCORSPreflightReturns204(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	os.Setenv("CORS_ORIGINS", "http://localhost:5173")
+	t.Setenv("CORS_ORIGINS", "http://localhost:5173")
 	r := gin.New()
 	r.Use(CORS())
 	r.OPTIONS("/test", func(c *gin.Context) {})
