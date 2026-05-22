@@ -1,0 +1,29 @@
+name: "Go — test"
+
+on:
+  workflow_call:
+
+jobs:
+  go-test:
+    name: Go Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: go test
+        run: go test ./... -race -count=1 -coverprofile=coverage.out
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: go-coverage
+          path: backend/coverage.out
+          retention-days: 7
