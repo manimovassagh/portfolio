@@ -9,7 +9,7 @@ import math
 import re
 from collections import defaultdict
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import pandas as pd
 import yfinance as yf
@@ -27,6 +27,19 @@ from .prices import KNOWN_TICKERS, fetch_prices, resolve_tickers
 
 logger = logging.getLogger(__name__)
 app = FastAPI(title="pricer", docs_url=None, redoc_url=None)
+
+
+def _date_str(value: Any) -> str:
+    formatter = getattr(value, "strftime", None)
+    return str(formatter("%Y-%m-%d")) if callable(formatter) else str(value)[:10]
+
+
+def _finite_float(value: Any) -> float | None:
+    try:
+        result = float(value)
+    except (TypeError, ValueError):
+        return None
+    return result if math.isfinite(result) else None
 
 
 def _validate_isins(isin_list: list[str]) -> None:
@@ -110,7 +123,7 @@ def quote(ticker: str = Query(...)) -> dict[str, Any]:
 
         price = _f(fi.get("lastPrice")) or _f(info.get("regularMarketPrice"))
         prev = _f(fi.get("previousClose")) or _f(info.get("previousClose"))
-        change = (_f(price) - _f(prev)) if price is not None and prev is not None else None
+        change = (price - prev) if price is not None and prev is not None else None
         change_pct = (change / prev * 100) if change is not None and prev and prev != 0 else None
 
         return {
@@ -157,12 +170,12 @@ def history(
             return {"series": []}
         series = []
         for ts, row in data.iterrows():
-            close = float(row["Close"])
+            close = float(cast(Any, row)["Close"])
             if not math.isfinite(close):
                 continue
             vol = row.get("Volume")
             series.append({
-                "date": ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10],
+                "date": _date_str(ts),
                 "close": close,
                 "volume": float(vol) if vol is not None and math.isfinite(float(vol)) else None,
             })
@@ -257,7 +270,7 @@ def _compute_portfolio_series(
         else:
             raw = download_cached(tickers, start=start_date)
             close = raw["Close"]
-        close = close.ffill()
+        close = cast(pd.DataFrame, close.ffill())
     except Exception as exc:
         logger.exception("yfinance historical download failed: %s", exc)
         return None
@@ -268,7 +281,7 @@ def _compute_portfolio_series(
         try:
             fx_raw = download_cached("EURUSD=X", start=start_date, label="fx")
             if not fx_raw.empty:
-                usd_to_eur = (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill()
+                usd_to_eur = cast(Any, (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill())
                 for t in non_eur:
                     if t in close.columns:
                         close[t] = close[t] * usd_to_eur
@@ -284,7 +297,7 @@ def _compute_portfolio_series(
     date_list: list[Any] = []
 
     for dt in close.index:
-        dt_str = dt.strftime("%Y-%m-%d")
+        dt_str = _date_str(dt)
         while tx_idx < len(sorted_txs) and sorted_txs[tx_idx].date <= dt_str:
             tx = sorted_txs[tx_idx]
             if tx.isin in tickers_map:
@@ -317,14 +330,14 @@ def _compute_portfolio_series(
     if not pv_list:
         return None
 
-    pv_series = pd.Series(pv_list, index=date_list)
-    cb_series = pd.Series(cb_list, index=date_list)
+    pv_series = cast(pd.Series, pd.Series(pv_list, index=date_list))
+    cb_series = cast(pd.Series, pd.Series(cb_list, index=date_list))
 
-    nonzero = pv_series[pv_series > 0]
+    nonzero = cast(pd.Series, pv_series[pv_series > 0])
     if nonzero.empty:
         return None
     first = nonzero.index[0]
-    return pv_series[first:], cb_series[first:]
+    return cast(pd.Series, pv_series[first:]), cast(pd.Series, cb_series[first:])
 
 
 def _validate_analytics_request(req: PortfolioAnalyticsRequest) -> None:
@@ -359,7 +372,7 @@ def portfolio_analytics(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
     sharpe: float | None = None
     volatility: float | None = None
     if len(daily_ret) >= 30:
-        std = float(daily_ret.std())
+        std = float(cast(Any, daily_ret.std()))
         if std > 0:
             sharpe = round(float(daily_ret.mean()) / std * math.sqrt(252), 3)
         volatility = round(std * math.sqrt(252), 4)
@@ -397,7 +410,7 @@ def portfolio_analytics(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
     for year in sorted(set(pnl_raw.index.year)):
         mask = pnl_raw.index.year == year
         year_pnl = pnl_raw[mask]
-        year_cb = cb_series[mask]
+        year_cb = cast(pd.Series, cb_series[mask])
         if year_pnl.empty:
             continue
         pnl_start = float(year_pnl.iloc[0])
@@ -452,7 +465,7 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
         else:
             raw = download_cached(tickers, start=start_date)
             close = raw["Close"]
-        close = close.ffill()
+        close = cast(pd.DataFrame, close.ffill())
     except Exception as exc:
         logger.exception("yfinance download failed: %s", exc)
         return {"series": [], "drawdown": [], "twr": [], "benchmark": []}
@@ -462,7 +475,7 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
         try:
             fx_raw = download_cached("EURUSD=X", start=start_date, label="fx")
             if not fx_raw.empty:
-                usd_to_eur = (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill()
+                usd_to_eur = cast(Any, (1.0 / fx_raw["Close"].ffill()).reindex(close.index).ffill())
                 for t in non_eur:
                     if t in close.columns:
                         close[t] = close[t] * usd_to_eur
@@ -485,7 +498,7 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
     date_list: list[Any] = []
 
     for dt in close.index:
-        dt_str = dt.strftime("%Y-%m-%d")
+        dt_str = _date_str(dt)
 
         # Snapshot shares BEFORE applying today's transactions (for correct TWR)
         shares_start = dict(shares_state)
@@ -564,16 +577,16 @@ def portfolio_performance(req: PortfolioAnalyticsRequest) -> dict[str, Any]:
         if bm_raw is not None and not bm_raw.empty:
             bm_close = bm_raw["Close"].ffill()
             # Filter to dates present in our date_list range
-            date_set = {dt.strftime("%Y-%m-%d") for dt in date_list}
-            first_portfolio_date = date_list[0].strftime("%Y-%m-%d")
+            date_set = {_date_str(dt) for dt in date_list}
+            first_portfolio_date = _date_str(date_list[0])
             bm_factor = 1.0
             bm_prev_price: float | None = None
             for ts, row in bm_close.items():
-                ts_str = ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)[:10]
+                ts_str = _date_str(ts)
                 if ts_str < first_portfolio_date:
-                    bm_prev_price = float(row)
+                    bm_prev_price = float(cast(Any, row))
                     continue
-                price = float(row)
+                price = float(cast(Any, row))
                 if not math.isfinite(price):
                     continue
                 if bm_prev_price is not None and bm_prev_price > 0:
