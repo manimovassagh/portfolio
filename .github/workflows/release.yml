@@ -1,0 +1,49 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  go-lint:
+    uses: ./.github/workflows/_go-lint.yml
+
+  go-test:
+    uses: ./.github/workflows/_go-test.yml
+
+  go-build:
+    needs: [go-lint, go-test]
+    uses: ./.github/workflows/_go-build.yml
+
+  python-lint:
+    uses: ./.github/workflows/_python-lint.yml
+
+  python-test:
+    uses: ./.github/workflows/_python-test.yml
+
+  frontend-lint:
+    uses: ./.github/workflows/_frontend-lint.yml
+
+  frontend-test:
+    uses: ./.github/workflows/_frontend-test.yml
+
+  frontend-build:
+    needs: [frontend-lint, frontend-test]
+    uses: ./.github/workflows/_frontend-build.yml
+
+  mobile-check:
+    uses: ./.github/workflows/_mobile-check.yml
+
+  docker:
+    needs: [go-build, python-lint, python-test, frontend-build, mobile-check]
+    uses: ./.github/workflows/docker.yml
+    secrets: inherit
+
+  e2e:
+    needs: docker
+    uses: ./.github/workflows/_e2e.yml
