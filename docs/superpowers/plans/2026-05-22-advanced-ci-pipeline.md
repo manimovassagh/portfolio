@@ -2,166 +2,59 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Replace three flat workflow files with nine focused, reusable blocks wired together by intelligent orchestrators — with path filtering, caching, linting, pytest, and a single branch-protection gate.
+**Goal:** Replace three flat workflow files with fully atomic reusable blocks — one file, one job — wired together by intelligent orchestrators with path filtering, caching, and a single branch-protection gate.
 
-**Architecture:** Six `workflow_call`-only reusable blocks (`_go`, `_python`, `_frontend`, `_mobile`, `_docker-service`, `_e2e`) are composed by three orchestrators (`ci`, `docker`, `release`). The `ci` orchestrator detects which service changed and only runs the relevant block; a `summary` job always runs and is the sole required branch-protection check.
+**Architecture:** Every CI concern is its own `workflow_call`-only file. Go gets 3 blocks (lint, test, build), Python gets 2 (lint, test), Frontend gets 3 (lint, test, build), Mobile gets 1, Docker gets 1 (parameterised), E2E gets 1. Orchestrators (`ci`, `docker`, `release`) compose these blocks like Lego — each block is independently callable and testable.
 
 **Tech Stack:** GitHub Actions, `dorny/paths-filter@v3`, `golangci/golangci-lint-action@v6`, `astral-sh/setup-uv@v5`, `docker/build-push-action@v6`, `actionlint` (local validation)
 
 ---
 
+## Completed
+
+- [x] Task 1: actionlint v1.7.12 installed
+- [x] Task 2: ESLint added to frontend (`client/package.json` + `eslint.config.js`), pushed
+
+---
+
 ## File Map
 
-| Action | Path |
-|--------|------|
-| Create | `.github/workflows/_go.yml` |
-| Create | `.github/workflows/_python.yml` |
-| Create | `.github/workflows/_frontend.yml` |
-| Create | `.github/workflows/_mobile.yml` |
-| Create | `.github/workflows/_docker-service.yml` |
-| Create | `.github/workflows/_e2e.yml` |
-| Rewrite | `.github/workflows/ci.yml` |
-| Create | `.github/workflows/docker.yml` |
-| Create | `.github/workflows/release.yml` |
-| Delete | `.github/workflows/docker-image.yml` |
-| Delete | `.github/workflows/e2e.yml` |
-| Modify | `client/package.json` — add `lint` script |
+| Action | Path | Responsibility |
+|--------|------|----------------|
+| Create | `.github/workflows/_go-lint.yml` | golangci-lint + go vet |
+| Create | `.github/workflows/_go-test.yml` | go test -race + coverage |
+| Create | `.github/workflows/_go-build.yml` | go build |
+| Create | `.github/workflows/_python-lint.yml` | pyright |
+| Create | `.github/workflows/_python-test.yml` | pytest |
+| Create | `.github/workflows/_frontend-lint.yml` | ESLint + tsc typecheck |
+| Create | `.github/workflows/_frontend-test.yml` | vitest |
+| Create | `.github/workflows/_frontend-build.yml` | vite build + upload dist |
+| Create | `.github/workflows/_mobile-check.yml` | tsc + expo-doctor |
+| Create | `.github/workflows/_docker-service.yml` | build + push one image |
+| Create | `.github/workflows/_e2e.yml` | Playwright |
+| Rewrite | `.github/workflows/ci.yml` | orchestrator: path filter + all blocks + summary gate |
+| Create | `.github/workflows/docker.yml` | orchestrator: matrix × 3 Docker builds |
+| Create | `.github/workflows/release.yml` | orchestrator: full suite → docker → e2e on tags |
+| Delete | `.github/workflows/docker-image.yml` | superseded |
+| Delete | `.github/workflows/e2e.yml` | superseded |
 
 ---
 
-## Task 1: Install actionlint (local workflow validator)
+## Task 3: Create `_go-lint.yml`
 
-**Files:** none (local tooling only)
-
-- [ ] **Step 1: Install actionlint**
-
-```bash
-brew install actionlint
-```
-
-If Homebrew not available:
-```bash
-go install github.com/rhysd/actionlint/cmd/actionlint@latest
-```
-
-- [ ] **Step 2: Confirm it works**
-
-```bash
-actionlint --version
-```
-
-Expected: prints version string like `actionlint 1.7.x`
-
----
-
-## Task 2: Add ESLint lint script to frontend
-
-**Files:**
-- Modify: `client/package.json`
-
-The existing `ci.yml` never lints the frontend. This task adds the `lint` npm script used by `_frontend.yml`. Modern Vite React TS projects include `eslint.config.js` already — we only need to expose the script.
-
-- [ ] **Step 1: Check if ESLint is already installed**
-
-```bash
-grep '"eslint"' client/package.json
-```
-
-If output is empty, run:
-```bash
-cd client && npm install --save-dev eslint @eslint/js globals typescript-eslint eslint-plugin-react-hooks eslint-plugin-react-refresh
-```
-
-- [ ] **Step 2: Check if `eslint.config.js` exists**
-
-```bash
-ls client/eslint.config.js 2>/dev/null && echo "exists" || echo "missing"
-```
-
-If missing, create `client/eslint.config.js`:
-
-```js
-import js from '@eslint/js'
-import globals from 'globals'
-import reactHooks from 'eslint-plugin-react-hooks'
-import reactRefresh from 'eslint-plugin-react-refresh'
-import tseslint from 'typescript-eslint'
-
-export default tseslint.config(
-  { ignores: ['dist'] },
-  {
-    extends: [js.configs.recommended, ...tseslint.configs.recommended],
-    files: ['**/*.{ts,tsx}'],
-    languageOptions: {
-      ecmaVersion: 2020,
-      globals: globals.browser,
-    },
-    plugins: {
-      'react-hooks': reactHooks,
-      'react-refresh': reactRefresh,
-    },
-    rules: {
-      ...reactHooks.configs.recommended.rules,
-      'react-refresh/only-export-components': ['warn', { allowConstantExport: true }],
-    },
-  },
-)
-```
-
-- [ ] **Step 3: Add `lint` script to `client/package.json`**
-
-In the `"scripts"` block, add:
-```json
-"lint": "eslint src/ --max-warnings 0"
-```
-
-Full scripts block after edit:
-```json
-"scripts": {
-  "dev": "vite --host 127.0.0.1 --port 5173",
-  "build": "vite build",
-  "typecheck": "tsc --noEmit",
-  "lint": "eslint src/ --max-warnings 0",
-  "test": "vitest run",
-  "test:watch": "vitest",
-  "test:e2e": "playwright test",
-  "test:e2e:ui": "playwright test --ui"
-}
-```
-
-- [ ] **Step 4: Verify lint runs locally**
-
-```bash
-cd client && npm run lint
-```
-
-Expected: exits 0 (or fix any pre-existing warnings if it fails).
-
-- [ ] **Step 5: Commit**
-
-```bash
-git add client/package.json client/eslint.config.js
-git commit -m "feat(frontend): add eslint lint script for CI"
-```
-
----
-
-## Task 3: Create `_go.yml` — reusable Go block
-
-**Files:**
-- Create: `.github/workflows/_go.yml`
+**Files:** Create `.github/workflows/_go-lint.yml`
 
 - [ ] **Step 1: Create the file**
 
 ```yaml
-name: "Go — lint, test, build"
+name: "Go — lint"
 
 on:
   workflow_call:
 
 jobs:
-  go:
-    name: Go
+  go-lint:
+    name: Go Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -182,6 +75,52 @@ jobs:
 
       - name: go vet
         run: go vet ./...
+```
+
+- [ ] **Step 2: Validate**
+
+```bash
+actionlint .github/workflows/_go-lint.yml
+```
+
+Expected: no output
+
+- [ ] **Step 3: Commit and push**
+
+```bash
+git add .github/workflows/_go-lint.yml
+git commit -m "ci: add _go-lint.yml block (golangci-lint + vet)"
+git push origin main
+```
+
+---
+
+## Task 4: Create `_go-test.yml`
+
+**Files:** Create `.github/workflows/_go-test.yml`
+
+- [ ] **Step 1: Create the file**
+
+```yaml
+name: "Go — test"
+
+on:
+  workflow_call:
+
+jobs:
+  go-test:
+    name: Go Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
 
       - name: go test
         run: go test ./... -race -count=1 -coverprofile=coverage.out
@@ -192,44 +131,90 @@ jobs:
           name: go-coverage
           path: backend/coverage.out
           retention-days: 7
-
-      - name: go build
-        run: go build ./cmd/api
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
-actionlint .github/workflows/_go.yml
+actionlint .github/workflows/_go-test.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
-git add .github/workflows/_go.yml
-git commit -m "ci: add reusable _go.yml block (lint, test, build)"
+git add .github/workflows/_go-test.yml
+git commit -m "ci: add _go-test.yml block (go test -race + coverage artifact)"
+git push origin main
 ```
 
 ---
 
-## Task 4: Create `_python.yml` — reusable Python block
+## Task 5: Create `_go-build.yml`
 
-**Files:**
-- Create: `.github/workflows/_python.yml`
+**Files:** Create `.github/workflows/_go-build.yml`
 
 - [ ] **Step 1: Create the file**
 
 ```yaml
-name: "Python — type-check, test"
+name: "Go — build"
 
 on:
   workflow_call:
 
 jobs:
-  python:
-    name: Python
+  go-build:
+    name: Go Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      - name: go build
+        run: go build ./cmd/api
+```
+
+- [ ] **Step 2: Validate**
+
+```bash
+actionlint .github/workflows/_go-build.yml
+```
+
+Expected: no output
+
+- [ ] **Step 3: Commit and push**
+
+```bash
+git add .github/workflows/_go-build.yml
+git commit -m "ci: add _go-build.yml block"
+git push origin main
+```
+
+---
+
+## Task 6: Create `_python-lint.yml`
+
+**Files:** Create `.github/workflows/_python-lint.yml`
+
+- [ ] **Step 1: Create the file**
+
+```yaml
+name: "Python — lint"
+
+on:
+  workflow_call:
+
+jobs:
+  python-lint:
+    name: Python Lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -244,44 +229,90 @@ jobs:
 
       - name: Pyright
         run: uv run pyright pricer/main.py
-
-      - name: pytest
-        run: uv run pytest pricer/tests/ -v --tb=short
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
-actionlint .github/workflows/_python.yml
+actionlint .github/workflows/_python-lint.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
-git add .github/workflows/_python.yml
-git commit -m "ci: add reusable _python.yml block (pyright + pytest)"
+git add .github/workflows/_python-lint.yml
+git commit -m "ci: add _python-lint.yml block (pyright)"
+git push origin main
 ```
 
 ---
 
-## Task 5: Create `_frontend.yml` — reusable Frontend block
+## Task 7: Create `_python-test.yml`
 
-**Files:**
-- Create: `.github/workflows/_frontend.yml`
+**Files:** Create `.github/workflows/_python-test.yml`
 
 - [ ] **Step 1: Create the file**
 
 ```yaml
-name: "Frontend — lint, typecheck, test, build"
+name: "Python — test"
 
 on:
   workflow_call:
 
 jobs:
-  frontend:
-    name: Frontend
+  python-test:
+    name: Python Test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: pytest
+        run: uv run pytest pricer/tests/ -v --tb=short
+```
+
+- [ ] **Step 2: Validate**
+
+```bash
+actionlint .github/workflows/_python-test.yml
+```
+
+Expected: no output
+
+- [ ] **Step 3: Commit and push**
+
+```bash
+git add .github/workflows/_python-test.yml
+git commit -m "ci: add _python-test.yml block (pytest)"
+git push origin main
+```
+
+---
+
+## Task 8: Create `_frontend-lint.yml`
+
+**Files:** Create `.github/workflows/_frontend-lint.yml`
+
+- [ ] **Step 1: Create the file**
+
+```yaml
+name: "Frontend — lint"
+
+on:
+  workflow_call:
+
+jobs:
+  frontend-lint:
+    name: Frontend Lint
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -303,9 +334,109 @@ jobs:
 
       - name: ESLint
         run: npm run lint
+```
+
+- [ ] **Step 2: Validate**
+
+```bash
+actionlint .github/workflows/_frontend-lint.yml
+```
+
+Expected: no output
+
+- [ ] **Step 3: Commit and push**
+
+```bash
+git add .github/workflows/_frontend-lint.yml
+git commit -m "ci: add _frontend-lint.yml block (ESLint + typecheck)"
+git push origin main
+```
+
+---
+
+## Task 9: Create `_frontend-test.yml`
+
+**Files:** Create `.github/workflows/_frontend-test.yml`
+
+- [ ] **Step 1: Create the file**
+
+```yaml
+name: "Frontend — test"
+
+on:
+  workflow_call:
+
+jobs:
+  frontend-test:
+    name: Frontend Test
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Vitest
         run: npm test
+```
+
+- [ ] **Step 2: Validate**
+
+```bash
+actionlint .github/workflows/_frontend-test.yml
+```
+
+Expected: no output
+
+- [ ] **Step 3: Commit and push**
+
+```bash
+git add .github/workflows/_frontend-test.yml
+git commit -m "ci: add _frontend-test.yml block (vitest)"
+git push origin main
+```
+
+---
+
+## Task 10: Create `_frontend-build.yml`
+
+**Files:** Create `.github/workflows/_frontend-build.yml`
+
+- [ ] **Step 1: Create the file**
+
+```yaml
+name: "Frontend — build"
+
+on:
+  workflow_call:
+
+jobs:
+  frontend-build:
+    name: Frontend Build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: client
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: client/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Vite build
         run: npm run build
@@ -318,39 +449,39 @@ jobs:
           retention-days: 1
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
-actionlint .github/workflows/_frontend.yml
+actionlint .github/workflows/_frontend-build.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
-git add .github/workflows/_frontend.yml
-git commit -m "ci: add reusable _frontend.yml block (lint, typecheck, vitest, build)"
+git add .github/workflows/_frontend-build.yml
+git commit -m "ci: add _frontend-build.yml block (vite build + dist artifact)"
+git push origin main
 ```
 
 ---
 
-## Task 6: Create `_mobile.yml` — reusable Mobile block
+## Task 11: Create `_mobile-check.yml`
 
-**Files:**
-- Create: `.github/workflows/_mobile.yml`
+**Files:** Create `.github/workflows/_mobile-check.yml`
 
 - [ ] **Step 1: Create the file**
 
 ```yaml
-name: "Mobile — typecheck"
+name: "Mobile — check"
 
 on:
   workflow_call:
 
 jobs:
-  mobile:
-    name: Mobile
+  mobile-check:
+    name: Mobile Check
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -375,29 +506,29 @@ jobs:
         continue-on-error: true
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
-actionlint .github/workflows/_mobile.yml
+actionlint .github/workflows/_mobile-check.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
-git add .github/workflows/_mobile.yml
-git commit -m "ci: add reusable _mobile.yml block (typecheck + expo-doctor)"
+git add .github/workflows/_mobile-check.yml
+git commit -m "ci: add _mobile-check.yml block (tsc + expo-doctor)"
+git push origin main
 ```
 
 ---
 
-## Task 7: Create `_docker-service.yml` — reusable Docker block
+## Task 12: Create `_docker-service.yml`
 
-**Files:**
-- Create: `.github/workflows/_docker-service.yml`
+**Files:** Create `.github/workflows/_docker-service.yml`
 
-This block builds and pushes **one** Docker image. It receives the service name and dockerfile path as inputs and constructs the GHCR image path internally — avoiding the need to pass `github.repository` through the matrix.
+Builds and pushes ONE Docker image. Receives `service` and `dockerfile` as inputs, constructs the GHCR image name internally (lowercased to satisfy GHCR requirements). GHA cache is scoped per service so backend/pricer/frontend layers never evict each other.
 
 - [ ] **Step 1: Create the file**
 
@@ -465,27 +596,27 @@ jobs:
           cache-to: type=gha,scope=${{ inputs.service }},mode=max
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
 actionlint .github/workflows/_docker-service.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
 git add .github/workflows/_docker-service.yml
-git commit -m "ci: add reusable _docker-service.yml block (build + push with GHA layer cache)"
+git commit -m "ci: add _docker-service.yml block (parameterised build+push, scoped GHA cache)"
+git push origin main
 ```
 
 ---
 
-## Task 8: Create `_e2e.yml` — reusable Playwright block
+## Task 13: Create `_e2e.yml`
 
-**Files:**
-- Create: `.github/workflows/_e2e.yml`
+**Files:** Create `.github/workflows/_e2e.yml`
 
 - [ ] **Step 1: Create the file**
 
@@ -537,29 +668,29 @@ jobs:
           retention-days: 7
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
 actionlint .github/workflows/_e2e.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
 git add .github/workflows/_e2e.yml
-git commit -m "ci: add reusable _e2e.yml block (Playwright + artifact upload)"
+git commit -m "ci: add _e2e.yml block (Playwright + artifact upload)"
+git push origin main
 ```
 
 ---
 
-## Task 9: Rewrite `ci.yml` — main orchestrator with path filtering + summary gate
+## Task 14: Rewrite `ci.yml` — main orchestrator
 
-**Files:**
-- Rewrite: `.github/workflows/ci.yml`
+**Files:** Rewrite `.github/workflows/ci.yml`
 
-This is the orchestrator that runs on every push/PR. A `changes` job detects which service files changed, and each service job only runs if its files were touched. The `summary` job always runs and is the single required branch-protection check.
+Path filter detects which service changed. Each atomic block is called only when relevant. The `summary` job always runs — it's the single required branch-protection check.
 
 - [ ] **Step 1: Overwrite `ci.yml` completely**
 
@@ -607,69 +738,104 @@ jobs:
             mobile:
               - 'mobile/**'
 
-  go:
+  # ── Go blocks ────────────────────────────────────────
+  go-lint:
     needs: changes
     if: needs.changes.outputs.backend == 'true'
-    uses: ./.github/workflows/_go.yml
+    uses: ./.github/workflows/_go-lint.yml
 
-  python:
+  go-test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/_go-test.yml
+
+  go-build:
+    needs: [go-lint, go-test]
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/_go-build.yml
+
+  # ── Python blocks ─────────────────────────────────────
+  python-lint:
     needs: changes
     if: needs.changes.outputs.pricer == 'true'
-    uses: ./.github/workflows/_python.yml
+    uses: ./.github/workflows/_python-lint.yml
 
-  frontend:
+  python-test:
+    needs: changes
+    if: needs.changes.outputs.pricer == 'true'
+    uses: ./.github/workflows/_python-test.yml
+
+  # ── Frontend blocks ───────────────────────────────────
+  frontend-lint:
     needs: changes
     if: needs.changes.outputs.frontend == 'true'
-    uses: ./.github/workflows/_frontend.yml
+    uses: ./.github/workflows/_frontend-lint.yml
 
-  mobile:
+  frontend-test:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend-test.yml
+
+  frontend-build:
+    needs: [frontend-lint, frontend-test]
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend-build.yml
+
+  # ── Mobile block ──────────────────────────────────────
+  mobile-check:
     needs: changes
     if: needs.changes.outputs.mobile == 'true'
-    uses: ./.github/workflows/_mobile.yml
+    uses: ./.github/workflows/_mobile-check.yml
 
+  # ── Gate ─────────────────────────────────────────────
   summary:
     name: CI Summary
-    needs: [go, python, frontend, mobile]
+    needs: [go-lint, go-test, go-build, python-lint, python-test, frontend-lint, frontend-test, frontend-build, mobile-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check job results
         run: |
           echo "Results:"
-          echo "  go:       ${{ needs.go.result }}"
-          echo "  python:   ${{ needs.python.result }}"
-          echo "  frontend: ${{ needs.frontend.result }}"
-          echo "  mobile:   ${{ needs.mobile.result }}"
+          echo "  go-lint:        ${{ needs.go-lint.result }}"
+          echo "  go-test:        ${{ needs.go-test.result }}"
+          echo "  go-build:       ${{ needs.go-build.result }}"
+          echo "  python-lint:    ${{ needs.python-lint.result }}"
+          echo "  python-test:    ${{ needs.python-test.result }}"
+          echo "  frontend-lint:  ${{ needs.frontend-lint.result }}"
+          echo "  frontend-test:  ${{ needs.frontend-test.result }}"
+          echo "  frontend-build: ${{ needs.frontend-build.result }}"
+          echo "  mobile-check:   ${{ needs.mobile-check.result }}"
           if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
-            echo "❌ CI failed — one or more jobs failed or were cancelled"
+            echo "❌ CI failed"
             exit 1
           fi
-          echo "✅ CI passed (jobs succeeded or skipped by path filter)"
+          echo "✅ CI passed"
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
 actionlint .github/workflows/ci.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
 git add .github/workflows/ci.yml
-git commit -m "ci: rewrite ci.yml with path filtering, reusable blocks, and summary gate"
+git commit -m "ci: rewrite ci.yml — atomic blocks, path filtering, summary gate"
+git push origin main
 ```
 
 ---
 
-## Task 10: Create `docker.yml` — Docker orchestrator (matrix × 3)
+## Task 15: Create `docker.yml` — Docker orchestrator
 
-**Files:**
-- Create: `.github/workflows/docker.yml`
+**Files:** Create `.github/workflows/docker.yml`
 
-Builds all three service images in parallel using matrix strategy. Accepts `workflow_call` so `release.yml` can invoke it without duplicating the matrix.
+Matrix × 3 parallel builds. Accepts `workflow_call` so `release.yml` can invoke it.
 
 - [ ] **Step 1: Create the file**
 
@@ -706,29 +872,29 @@ jobs:
     secrets: inherit
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
 actionlint .github/workflows/docker.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
 git add .github/workflows/docker.yml
-git commit -m "ci: add docker.yml orchestrator — parallel matrix build for all 3 services"
+git commit -m "ci: add docker.yml orchestrator (matrix × 3 parallel image builds)"
+git push origin main
 ```
 
 ---
 
-## Task 11: Create `release.yml` — release orchestrator
+## Task 16: Create `release.yml` — release orchestrator
 
-**Files:**
-- Create: `.github/workflows/release.yml`
+**Files:** Create `.github/workflows/release.yml`
 
-Triggered on `v*.*.*` tags. Runs full CI suite (no path filter — everything must pass on release), then Docker builds, then E2E — sequentially gated.
+On version tag push: all blocks in parallel → docker (gated) → e2e (gated). No path filtering — everything must pass on a release.
 
 - [ ] **Step 1: Create the file**
 
@@ -745,20 +911,37 @@ permissions:
   packages: write
 
 jobs:
-  go:
-    uses: ./.github/workflows/_go.yml
+  go-lint:
+    uses: ./.github/workflows/_go-lint.yml
 
-  python:
-    uses: ./.github/workflows/_python.yml
+  go-test:
+    uses: ./.github/workflows/_go-test.yml
 
-  frontend:
-    uses: ./.github/workflows/_frontend.yml
+  go-build:
+    needs: [go-lint, go-test]
+    uses: ./.github/workflows/_go-build.yml
 
-  mobile:
-    uses: ./.github/workflows/_mobile.yml
+  python-lint:
+    uses: ./.github/workflows/_python-lint.yml
+
+  python-test:
+    uses: ./.github/workflows/_python-test.yml
+
+  frontend-lint:
+    uses: ./.github/workflows/_frontend-lint.yml
+
+  frontend-test:
+    uses: ./.github/workflows/_frontend-test.yml
+
+  frontend-build:
+    needs: [frontend-lint, frontend-test]
+    uses: ./.github/workflows/_frontend-build.yml
+
+  mobile-check:
+    uses: ./.github/workflows/_mobile-check.yml
 
   docker:
-    needs: [go, python, frontend, mobile]
+    needs: [go-build, python-lint, python-test, frontend-build, mobile-check]
     uses: ./.github/workflows/docker.yml
     secrets: inherit
 
@@ -767,45 +950,41 @@ jobs:
     uses: ./.github/workflows/_e2e.yml
 ```
 
-- [ ] **Step 2: Validate with actionlint**
+- [ ] **Step 2: Validate**
 
 ```bash
 actionlint .github/workflows/release.yml
 ```
 
-Expected: no output (clean)
+Expected: no output
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit and push**
 
 ```bash
 git add .github/workflows/release.yml
-git commit -m "ci: add release.yml — full suite → docker → e2e on version tags"
+git commit -m "ci: add release.yml — full atomic suite → docker → e2e on version tags"
+git push origin main
 ```
 
 ---
 
-## Task 12: Delete old workflow files
+## Task 17: Delete old workflow files
 
 **Files:**
-- Delete: `.github/workflows/docker-image.yml` (replaced by `docker.yml`)
-- Delete: `.github/workflows/e2e.yml` (replaced by `_e2e.yml` + `ci.yml`)
+- Delete `.github/workflows/docker-image.yml`
+- Delete `.github/workflows/e2e.yml`
 
-- [ ] **Step 1: Delete stale files**
-
-```bash
-git rm .github/workflows/docker-image.yml
-git rm .github/workflows/e2e.yml
-```
-
-- [ ] **Step 2: Commit**
+- [ ] **Step 1: Delete and commit**
 
 ```bash
+git rm .github/workflows/docker-image.yml .github/workflows/e2e.yml
 git commit -m "ci: remove stale docker-image.yml and e2e.yml (superseded by modular pipeline)"
+git push origin main
 ```
 
 ---
 
-## Task 13: Full validation pass
+## Task 18: Full validation pass
 
 **Files:** none
 
@@ -815,74 +994,36 @@ git commit -m "ci: remove stale docker-image.yml and e2e.yml (superseded by modu
 actionlint .github/workflows/*.yml
 ```
 
-Expected: no output. If errors appear, fix them before proceeding.
+Expected: no output
 
-- [ ] **Step 2: Verify file list is correct**
+- [ ] **Step 2: Verify final file list**
 
 ```bash
 ls .github/workflows/
 ```
 
-Expected output:
+Expected:
 ```
 _docker-service.yml
 _e2e.yml
-_frontend.yml
-_go.yml
-_mobile.yml
-_python.yml
+_frontend-build.yml
+_frontend-lint.yml
+_frontend-test.yml
+_go-build.yml
+_go-lint.yml
+_go-test.yml
+_mobile-check.yml
+_python-lint.yml
+_python-test.yml
 ci.yml
 docker.yml
 release.yml
 ```
 
-No other `.yml` files should be present.
-
-- [ ] **Step 3: Push to GitHub and watch CI run**
+- [ ] **Step 3: Final push**
 
 ```bash
 git push origin main
 ```
 
-Then open the Actions tab on GitHub. The `CI` workflow should appear. Since no service files changed in the commit, all four service jobs will be skipped by the path filter, and `summary` should show green.
-
-- [ ] **Step 4: Set branch protection rule in GitHub**
-
-Go to **Settings → Branches → Add rule** for `main`:
-- Require status checks: **`CI Summary`** (from `ci.yml`)
-- Check "Require branches to be up to date"
-
-This is the only rule needed — `summary` covers all four services.
-
-- [ ] **Step 5: Trigger a test PR to verify path filtering**
-
-Make a trivial change to `backend/` on a new branch:
-```bash
-git checkout -b test/ci-path-filter
-echo "// test" >> backend/cmd/api/main.go
-git add backend/cmd/api/main.go
-git commit -m "test: trigger go path filter"
-git push origin test/ci-path-filter
-```
-
-Open a PR. Expected: only the `go` job runs. `python`, `frontend`, `mobile` are skipped. `summary` passes.
-
-After verifying, close the PR without merging:
-```bash
-git checkout main
-git branch -d test/ci-path-filter
-git push origin --delete test/ci-path-filter
-```
-
----
-
-## Self-Review Checklist
-
-- [x] `_go.yml` covers issue #61 indirectly (linting) — `_python.yml` covers it directly (pytest)
-- [x] `_docker-service.yml` lowercases the GHCR image name before use
-- [x] `docker.yml` uses `fail-fast: false` so a pricer build failure doesn't cancel the backend build
-- [x] `release.yml` runs all blocks unconditionally (no path filter) — correct for release gate
-- [x] `summary` uses `if: always()` — runs even if upstream jobs are skipped by path filter
-- [x] Old `docker-image.yml` (which used non-existent `checkout@v6`) is deleted
-- [x] Old `e2e.yml` is deleted — E2E is now a block called by `release.yml` only (not on every PR)
-- [x] All `uses:` calls reference `actions/checkout@v4` (not v5/v6)
+Open GitHub Actions tab — CI workflow should trigger and show the `changes` job + `summary` green (all service jobs skipped by path filter since only workflow files changed).
