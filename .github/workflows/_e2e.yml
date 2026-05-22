@@ -11,9 +11,9 @@ jobs:
       run:
         working-directory: client
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           cache: "npm"
@@ -26,20 +26,23 @@ jobs:
         run: npx playwright install chromium --with-deps
 
       - name: Run E2E tests
-        run: npm run test:e2e
+        run: |
+          unset FORCE_COLOR
+          npm run test:e2e
 
       - name: Upload Playwright report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: client/playwright-report/
           retention-days: 7
 
       - name: Upload failure screenshots
-        if: failure()
-        uses: actions/upload-artifact@v4
+        if: always()
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-screenshots
           path: client/test-results/
+          if-no-files-found: ignore
           retention-days: 7
