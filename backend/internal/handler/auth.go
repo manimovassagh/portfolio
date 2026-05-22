@@ -90,13 +90,3 @@ func (h *AuthHandler) Logout(c *gin.Context) {
 	auth.ClearSessionCookie(c, h.cfg.CookieSecure)
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})
 }
-
-func devUser() model.User {
-	return model.User{
-		ID:        "dev:local",
-		Provider:  "dev",
-		Email:     "local@kapital.dev",
-		Name:      "Local User",
-		CreatedAt: time.Now().UTC().Format(time.RFC3339),
-	}
-}

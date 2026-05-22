@@ -36,8 +36,8 @@ func ComputeCash(txs []model.Transaction) model.CashSummary {
 		case "STOCKPERK":
 			cs.StockPerks += tx.Amount
 		}
-		cs.Fees += -tx.Fee  // fee stored negative in TR exports
-		cs.Tax += -tx.Tax   // tax stored negative in TR exports
+		cs.Fees += -tx.Fee // fee stored negative in TR exports
+		cs.Tax += -tx.Tax  // tax stored negative in TR exports
 		cs.CashBalance += tx.Amount + tx.Fee + tx.Tax
 		if strings.ToUpper(tx.Category) == "TRADING" {
 			cs.Invested += -tx.Amount
@@ -257,7 +257,7 @@ func XIRR(txs []model.Transaction, portValue float64) *float64 {
 			return &result
 		}
 		if fa*fc < 0 {
-			b, fb = c, fc
+			b = c
 		} else {
 			a, fa = c, fc
 		}

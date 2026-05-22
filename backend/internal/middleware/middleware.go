@@ -11,7 +11,7 @@ func Logger() gin.HandlerFunc {
 		start := time.Now()
 		c.Next()
 		duration := time.Since(start)
-		gin.DefaultWriter.Write([]byte(
+		_, _ = gin.DefaultWriter.Write([]byte(
 			c.Request.Method + " " + c.Request.URL.Path +
 				" " + duration.String() + "\n",
 		))

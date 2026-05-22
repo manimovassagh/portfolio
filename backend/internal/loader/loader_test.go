@@ -33,10 +33,14 @@ func TestLoad(t *testing.T) {
 	}
 	defer os.Remove(f.Name())
 
-	f.WriteString(`"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
+	if _, err := f.WriteString(`"datetime","date","account_type","category","type","asset_class","name","symbol","shares","price","amount","fee","tax","currency","original_amount","original_currency","fx_rate","description","transaction_id","counterparty_name","counterparty_iban","payment_reference","mcc_code"
 "2025-04-03T11:26:34.643Z","2025-04-03","DEFAULT","TRADING","BUY","FUND","World ETF","IE000TEST01","1.5","100.0","-150.0","-1.0","","EUR","","","","Buy","tx1","","","",""
-`)
-	f.Close()
+`); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
 
 	txs, err := loader.Load(f.Name())
 	if err != nil {
@@ -59,8 +63,12 @@ func TestLoad(t *testing.T) {
 
 func TestLatestExport(t *testing.T) {
 	dir := t.TempDir()
-	os.WriteFile(filepath.Join(dir, "a.csv"), []byte("x"), 0644)
-	os.WriteFile(filepath.Join(dir, "b.csv"), []byte("x"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "a.csv"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "b.csv"), []byte("x"), 0644); err != nil {
+		t.Fatal(err)
+	}
 	path, err := loader.LatestExport(dir)
 	if err != nil {
 		t.Fatal(err)
@@ -155,7 +163,9 @@ func TestLoadAll(t *testing.T) {
 	dir := t.TempDir()
 	row := "2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,10,80.50,805.00,0.99,0.00,\n"
 	for _, name := range []string{"a.csv", "b.csv"} {
-		os.WriteFile(filepath.Join(dir, name), []byte(csvHeader+row), 0644)
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(csvHeader+row), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	txs, err := loader.LoadAll(dir)
 	if err != nil {
@@ -171,7 +181,9 @@ func TestLoadExport_All(t *testing.T) {
 	dir := t.TempDir()
 	row := "2024-01-15T10:00:00,2024-01-15,Purchase,Buy,Equity,iShares MSCI World,IE00B4L5Y983,10,80.50,805.00,0.99,0.00,\n"
 	for _, name := range []string{"x.csv", "y.csv"} {
-		os.WriteFile(filepath.Join(dir, name), []byte(csvHeader+row), 0644)
+		if err := os.WriteFile(filepath.Join(dir, name), []byte(csvHeader+row), 0644); err != nil {
+			t.Fatal(err)
+		}
 	}
 	txs, err := loader.LoadExport(dir, "all")
 	if err != nil {

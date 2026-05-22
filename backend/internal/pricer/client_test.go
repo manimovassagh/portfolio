@@ -15,10 +15,12 @@ func TestGetPrices(t *testing.T) {
 			http.NotFound(w, r)
 			return
 		}
-		json.NewEncoder(w).Encode(map[string]float64{
+		if err := json.NewEncoder(w).Encode(map[string]float64{
 			"IE00BK5BQT80": 159.76,
 			"BTC":          66000.0,
-		})
+		}); err != nil {
+			t.Errorf("encode response: %v", err)
+		}
 	}))
 	defer srv.Close()
 
