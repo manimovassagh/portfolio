@@ -113,7 +113,7 @@ export async function registerPasskey(username: string): Promise<AuthSession> {
   }
 
   // Step 2: create credential in browser.
-  const credential = await navigator.credentials.create({ publicKey: pk as PublicKeyCredentialCreationOptions });
+  const credential = await navigator.credentials.create({ publicKey: pk as unknown as PublicKeyCredentialCreationOptions });
   if (!credential) throw new Error('Credential creation was cancelled');
   const pkc = credential as PublicKeyCredential;
   const resp = pkc.response as AuthenticatorAttestationResponse;
@@ -157,7 +157,7 @@ export async function loginWithPasskey(): Promise<AuthSession> {
   }
 
   // Step 2: get assertion from browser.
-  const credential = await navigator.credentials.get({ publicKey: pk as PublicKeyCredentialRequestOptions });
+  const credential = await navigator.credentials.get({ publicKey: pk as unknown as PublicKeyCredentialRequestOptions });
   if (!credential) throw new Error('Authentication was cancelled');
   const pkc = credential as PublicKeyCredential;
   const resp = pkc.response as AuthenticatorAssertionResponse;

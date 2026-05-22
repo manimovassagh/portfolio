@@ -23,6 +23,8 @@ jobs:
         with:
           working-directory: backend
           args: --timeout 5m
+          install-mode: goinstall
+          version: latest
 
       - name: go vet
         run: go vet ./...
