@@ -1,5 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Star, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
+import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { getAuthSession, listExports, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
@@ -193,6 +193,7 @@ export default function App() {
 
   useEffect(() => {
     let mounted = true;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
     listExports()
       .then((items) => {
@@ -227,6 +228,7 @@ export default function App() {
   useEffect(() => {
     let mounted = true;
     if (!routeAssetIsin || !exportName) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setModal(null);
       return () => { mounted = false; };
     }
@@ -293,6 +295,7 @@ export default function App() {
     return () => document.removeEventListener('mousedown', handler);
   }, [mobileMenuOpen]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileMenuOpen(false); }, [active]);
 
   const holderName   = data?.summary.holder_name;

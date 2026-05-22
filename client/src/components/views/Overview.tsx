@@ -26,6 +26,7 @@ interface OverviewProps {
   navigate: (id: SectionId) => void;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function Overview({ data, dark, chartMode, openAsset, navigate }: OverviewProps) {
   const s = data.summary;
   const t = chartTheme(true);
@@ -54,6 +55,7 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
   const [benchmarkPoints, setBenchmarkPoints] = useState<BenchmarkPoint[] | null>(data.perf.benchmark);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setBenchmarkPoints(null);
     if (!benchmarkTicker) return;
     let cancelled = false;

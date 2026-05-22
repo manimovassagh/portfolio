@@ -3,7 +3,7 @@ import { Target } from 'lucide-react';
 import { Card } from '../ui/Card';
 import { PanelTitle } from '../ui/PanelTitle';
 import { ProgressBar } from '../ui/ProgressBar';
-import { fmtEUR, pct } from '../../lib/format';
+import { fmtEUR } from '../../lib/format';
 import type { DashboardData } from '../../types';
 
 const inputCls = 'w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm font-semibold text-slate-900 focus:border-emerald-500 focus:outline-none dark:border-slate-700 dark:bg-slate-800 dark:text-slate-100';

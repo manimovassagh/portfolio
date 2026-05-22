@@ -13,6 +13,7 @@ type WatchlistForm = { isin: string; ticker: string; name: string; notes: string
 
 const EMPTY_FORM: WatchlistForm = { isin: '', ticker: '', name: '', notes: '', target_price: '' };
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function WatchlistView({ exportName: _exportName }: { exportName: ExportName }) {
   const queryClient = useQueryClient();
   const { data: watchlist, isLoading: loading, isError } = useWatchlistQuery();

@@ -119,7 +119,27 @@ export function MarketsView() {
     }
   };
 
+  const loadQuoteAndChart = useCallback(async (ticker: string, r: Range) => {
+    setError(null);
+    setLoadingQuote(true);
+    setLoadingChart(true);
+    try {
+      const [q, h] = await Promise.all([
+        marketQuote(ticker),
+        marketHistory(ticker, r),
+      ]);
+      setQuote(q);
+      setCandles(h);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load market data');
+    } finally {
+      setLoadingQuote(false);
+      setLoadingChart(false);
+    }
+  }, []);
+
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadQuoteAndChart(DEFAULT.ticker, '1M');
     setLoadingNews(true);
     marketNews(DEFAULT.ticker).then(setNews).catch(() => setNews([])).finally(() => setLoadingNews(false));
@@ -148,25 +168,6 @@ export function MarketsView() {
       setShowDrop(r.length > 0);
     }, 280);
   };
-
-  const loadQuoteAndChart = useCallback(async (ticker: string, r: Range) => {
-    setError(null);
-    setLoadingQuote(true);
-    setLoadingChart(true);
-    try {
-      const [q, h] = await Promise.all([
-        marketQuote(ticker),
-        marketHistory(ticker, r),
-      ]);
-      setQuote(q);
-      setCandles(h);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to load market data');
-    } finally {
-      setLoadingQuote(false);
-      setLoadingChart(false);
-    }
-  }, []);
 
   const selectStock = (result: MarketSearchResult) => {
     setSelected(result);
