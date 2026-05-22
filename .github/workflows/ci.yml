@@ -6,63 +6,111 @@ on:
   pull_request:
     branches: [main]
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 jobs:
-  go:
-    name: Go — vet, test, build
+  changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.filter.outputs.backend }}
+      pricer: ${{ steps.filter.outputs.pricer }}
+      frontend: ${{ steps.filter.outputs.frontend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
     steps:
       - uses: actions/checkout@v4
-
-      - uses: actions/setup-go@v5
+      - uses: dorny/paths-filter@v3
+        id: filter
         with:
-          go-version-file: backend/go.mod
+          filters: |
+            backend:
+              - 'backend/**'
+              - 'go.work'
+              - 'go.work.sum'
+            pricer:
+              - 'pricer/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+            frontend:
+              - 'client/**'
+            mobile:
+              - 'mobile/**'
 
-      - name: go vet
-        working-directory: backend
-        run: go vet ./...
+  # ── Go blocks ────────────────────────────────────────
+  go-lint:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/_go-lint.yml
 
-      - name: go test
-        working-directory: backend
-        run: go test ./... -count=1
+  go-test:
+    needs: changes
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/_go-test.yml
 
-      - name: go build
-        working-directory: backend
-        run: go build ./cmd/api
+  go-build:
+    needs: [changes, go-lint, go-test]
+    if: needs.changes.outputs.backend == 'true'
+    uses: ./.github/workflows/_go-build.yml
 
-  python:
-    name: Python — uv sync + pyright
+  # ── Python blocks ─────────────────────────────────────
+  python-lint:
+    needs: changes
+    if: needs.changes.outputs.pricer == 'true'
+    uses: ./.github/workflows/_python-lint.yml
+
+  python-test:
+    needs: changes
+    if: needs.changes.outputs.pricer == 'true'
+    uses: ./.github/workflows/_python-test.yml
+
+  # ── Frontend blocks ───────────────────────────────────
+  frontend-lint:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend-lint.yml
+
+  frontend-test:
+    needs: changes
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend-test.yml
+
+  frontend-build:
+    needs: [changes, frontend-lint, frontend-test]
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_frontend-build.yml
+
+  # ── Mobile block ──────────────────────────────────────
+  mobile-check:
+    needs: changes
+    if: needs.changes.outputs.mobile == 'true'
+    uses: ./.github/workflows/_mobile-check.yml
+
+  # ── Gate ─────────────────────────────────────────────
+  summary:
+    name: CI Summary
+    needs: [go-lint, go-test, go-build, python-lint, python-test, frontend-lint, frontend-test, frontend-build, mobile-check]
+    if: always()
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: astral-sh/setup-uv@v5
-
-      - name: Install dependencies
-        run: uv sync
-
-      - name: Pyright type-check pricer
-        run: uv run pyright pricer/main.py
-
-      # No pytest yet — tests don't exist
-
-  frontend:
-    name: Frontend — typecheck + build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: TypeScript type-check
-        run: npm run typecheck
-
-      - name: Vite build
-        run: npm run build
-
-      - name: Run Vitest
-        run: npm test
+      - name: Check job results
+        run: |
+          echo "Results:"
+          echo "  go-lint:        ${{ needs.go-lint.result }}"
+          echo "  go-test:        ${{ needs.go-test.result }}"
+          echo "  go-build:       ${{ needs.go-build.result }}"
+          echo "  python-lint:    ${{ needs.python-lint.result }}"
+          echo "  python-test:    ${{ needs.python-test.result }}"
+          echo "  frontend-lint:  ${{ needs.frontend-lint.result }}"
+          echo "  frontend-test:  ${{ needs.frontend-test.result }}"
+          echo "  frontend-build: ${{ needs.frontend-build.result }}"
+          echo "  mobile-check:   ${{ needs.mobile-check.result }}"
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "CI failed"
+            exit 1
+          fi
+          echo "CI passed"
