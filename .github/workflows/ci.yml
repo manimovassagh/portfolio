@@ -84,6 +84,11 @@ jobs:
     if: needs.changes.outputs.frontend == 'true'
     uses: ./.github/workflows/_frontend-build.yml
 
+  e2e:
+    needs: [changes, frontend-build]
+    if: needs.changes.outputs.frontend == 'true'
+    uses: ./.github/workflows/_e2e.yml
+
   # ── Mobile block ──────────────────────────────────────
   mobile-check:
     needs: changes
@@ -93,7 +98,7 @@ jobs:
   # ── Gate ─────────────────────────────────────────────
   summary:
     name: CI Summary
-    needs: [go-lint, go-test, go-build, python-lint, python-test, frontend-lint, frontend-test, frontend-build, mobile-check]
+    needs: [go-lint, go-test, go-build, python-lint, python-test, frontend-lint, frontend-test, frontend-build, e2e, mobile-check]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -108,6 +113,7 @@ jobs:
           echo "  frontend-lint:  ${{ needs.frontend-lint.result }}"
           echo "  frontend-test:  ${{ needs.frontend-test.result }}"
           echo "  frontend-build: ${{ needs.frontend-build.result }}"
+          echo "  e2e:            ${{ needs.e2e.result }}"
           echo "  mobile-check:   ${{ needs.mobile-check.result }}"
           if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
             echo "CI failed"
