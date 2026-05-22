@@ -1,0 +1,30 @@
+name: Publish Docker images
+
+on:
+  workflow_call:
+  workflow_dispatch:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    name: "Build ${{ matrix.service }}"
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - service: backend
+            dockerfile: Dockerfile.backend
+          - service: pricer
+            dockerfile: Dockerfile.pricer
+          - service: frontend
+            dockerfile: Dockerfile.frontend
+    uses: ./.github/workflows/_docker-service.yml
+    with:
+      service: ${{ matrix.service }}
+      dockerfile: ${{ matrix.dockerfile }}
+    secrets: inherit
