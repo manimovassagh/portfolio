@@ -34,7 +34,7 @@ The repo ships with `exports/sample-portfolio.csv` so you can run immediately wi
 
 | Layer | Tech |
 |---|---|
-| API backend | Go 1.23, Gin |
+| API backend | Go 1.26.1, Gin |
 | Pricer microservice | Python 3.12, FastAPI, yfinance, pandas |
 | Frontend | React 19, TypeScript, Vite, Tailwind CSS v4, ApexCharts |
 | Persistence | CSV exports + SQLite watchlist |
@@ -45,7 +45,7 @@ The repo ships with `exports/sample-portfolio.csv` so you can run immediately wi
 
 ## Quick start
 
-**Prerequisites:** Go 1.23+, Python 3.12+, Node 20+, [`uv`](https://github.com/astral-sh/uv)
+**Prerequisites:** Go 1.26.1+, Python 3.12+, Node 20+, [`uv`](https://github.com/astral-sh/uv)
 
 ```bash
 npm install && uv sync   # install dependencies once
@@ -99,6 +99,22 @@ After `make docker`:
 - Pricer: `http://localhost:8001`
 
 Place your CSV exports in `exports/` before starting — they are volume-mounted.
+
+---
+
+## CI and releases
+
+The GitHub Actions graph runs all checks on pushes and pull requests to `main`:
+
+- Go lint, test, and build
+- Python lint and tests
+- Frontend lint, tests, build, and Playwright E2E
+- Mobile TypeScript check and Expo Doctor
+- Final CI Summary gate that fails if any required block fails or is cancelled
+
+Version tags matching `v*.*.*` run the release workflow. The release workflow repeats the lint/test/build checks, builds and pushes the backend, pricer, and frontend Docker images to GHCR, then runs E2E after the images are built.
+
+Publishing a GitHub release also triggers the Docker image workflow so the release packages are rebuilt and tagged from the published release event.
 
 ---
 
