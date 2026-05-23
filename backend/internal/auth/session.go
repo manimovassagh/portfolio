@@ -20,6 +20,8 @@ var ErrNoSession = errors.New("no session")
 
 type SessionStore interface {
 	CreateUser(provider, providerSubject, email, name string) (model.User, error)
+	CreateLocalUser(email, name, passwordHash string) (model.User, error)
+	GetLocalUserByEmail(email string) (model.User, string, error)
 	CreateSession(userID string, expiresAt time.Time) (model.Session, error)
 	GetSession(token string, now time.Time) (model.Session, model.User, error)
 	DeleteSession(token string) error

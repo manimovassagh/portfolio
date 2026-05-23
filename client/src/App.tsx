@@ -332,7 +332,7 @@ export default function App() {
           {active === 'watchlist' && (
             authenticated
               ? <WatchlistView exportName={exportName} />
-              : <AuthScreen embedded allowDevLogin={!authLoading && !authSession?.required} onAuthenticated={acceptAuthSession} />
+              : <AuthScreen embedded onAuthenticated={acceptAuthSession} />
           )}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
@@ -343,7 +343,7 @@ export default function App() {
   }, [acceptAuthSession, active, authenticated, authSession?.required, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
 
   const authView = !authenticated ? (
-    <AuthScreen onAuthenticated={acceptAuthSession} allowDevLogin={!authLoading && !authSession?.required} />
+    <AuthScreen onAuthenticated={acceptAuthSession} />
   ) : null;
 
   if (authView) {
@@ -576,7 +576,7 @@ export default function App() {
       {authPromptOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm" onMouseDown={() => setAuthPromptOpen(false)}>
           <div onMouseDown={(event) => event.stopPropagation()}>
-            <AuthScreen embedded allowDevLogin={!authLoading && !authSession?.required} onAuthenticated={acceptAuthSession} />
+            <AuthScreen embedded onAuthenticated={acceptAuthSession} />
           </div>
         </div>
       )}

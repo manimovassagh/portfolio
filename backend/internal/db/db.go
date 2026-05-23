@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/base64"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/manimovassagh/portfolio/internal/model"
@@ -25,6 +26,9 @@ func Open(path string) (*Store, error) {
 	}
 	s := &Store{db: conn}
 	if err := s.migrate(); err != nil {
+		return nil, err
+	}
+	if err := s.ensureUserPasswordHashColumn(); err != nil {
 		return nil, err
 	}
 	return s, nil
@@ -61,6 +65,7 @@ func (s *Store) migrate() error {
 		provider_subject TEXT NOT NULL,
 		email            TEXT NOT NULL DEFAULT '',
 		name             TEXT NOT NULL DEFAULT '',
+		password_hash    TEXT NOT NULL DEFAULT '',
 		created_at       TEXT NOT NULL,
 		UNIQUE(provider, provider_subject)
 	);
@@ -78,6 +83,33 @@ func (s *Store) migrate() error {
 		aaguid     TEXT NOT NULL DEFAULT '',
 		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	)`)
+	return err
+}
+
+func (s *Store) ensureUserPasswordHashColumn() error {
+	rows, err := s.db.Query(`PRAGMA table_info(users)`)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notnull int
+		var dfltValue any
+		var pk int
+		if err := rows.Scan(&cid, &name, &colType, &notnull, &dfltValue, &pk); err != nil {
+			return err
+		}
+		if name == "password_hash" {
+			return nil
+		}
+	}
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	_, err = s.db.Exec(`ALTER TABLE users ADD COLUMN password_hash TEXT NOT NULL DEFAULT ''`)
 	return err
 }
 
@@ -121,12 +153,26 @@ func (s *Store) CreateUser(provider, providerSubject, email, name string) (model
 	id := provider + ":" + providerSubject
 	now := time.Now().UTC().Format(time.RFC3339)
 	_, err := s.db.Exec(
-		`INSERT INTO users (id, provider, provider_subject, email, name, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?)
+		`INSERT INTO users (id, provider, provider_subject, email, name, password_hash, created_at)
+		 VALUES (?, ?, ?, ?, ?, '', ?)
 		 ON CONFLICT(provider, provider_subject) DO UPDATE SET
 			email = excluded.email,
 			name = excluded.name`,
 		id, provider, providerSubject, email, name, now)
+	if err != nil {
+		return model.User{}, err
+	}
+	return s.getUserByID(id)
+}
+
+func (s *Store) CreateLocalUser(email, name, passwordHash string) (model.User, error) {
+	normEmail := normalizeEmail(email)
+	id := "local:" + normEmail
+	now := time.Now().UTC().Format(time.RFC3339)
+	_, err := s.db.Exec(
+		`INSERT INTO users (id, provider, provider_subject, email, name, password_hash, created_at)
+		 VALUES (?, 'local', ?, ?, ?, ?, ?)`,
+		id, normEmail, email, name, passwordHash, now)
 	if err != nil {
 		return model.User{}, err
 	}
@@ -189,12 +235,28 @@ func (s *Store) getUserByID(id string) (model.User, error) {
 	return user, err
 }
 
+func (s *Store) GetLocalUserByEmail(email string) (model.User, string, error) {
+	var user model.User
+	var passwordHash string
+	err := s.db.QueryRow(
+		`SELECT id, provider, provider_subject, email, name, password_hash, created_at
+		 FROM users
+		 WHERE provider = 'local' AND provider_subject = ?`,
+		normalizeEmail(email),
+	).Scan(&user.ID, &user.Provider, &user.ProviderSubject, &user.Email, &user.Name, &passwordHash, &user.CreatedAt)
+	return user, passwordHash, err
+}
+
 func newSessionToken() (string, error) {
 	var b [32]byte
 	if _, err := rand.Read(b[:]); err != nil {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b[:]), nil
+}
+
+func normalizeEmail(email string) string {
+	return strings.ToLower(strings.TrimSpace(email))
 }
 
 // SavePasskeyCredential stores a new passkey credential for a user.

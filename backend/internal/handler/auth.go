@@ -13,6 +13,7 @@ import (
 	"github.com/manimovassagh/portfolio/internal/auth"
 	"github.com/manimovassagh/portfolio/internal/config"
 	"github.com/manimovassagh/portfolio/internal/model"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthHandler struct {
@@ -44,9 +45,10 @@ func (h *AuthHandler) Session(c *gin.Context) {
 func (h *AuthHandler) Providers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"providers": gin.H{
+			"local":   true,
 			"google":  os.Getenv("GOOGLE_CLIENT_ID") != "",
 			"apple":   os.Getenv("APPLE_CLIENT_ID") != "",
-			"passkey": true,
+			"passkey": false,
 		},
 	})
 }
@@ -59,8 +61,82 @@ func (h *AuthHandler) Apple(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{"error": "Apple Sign in is not configured yet"})
 }
 
-func (h *AuthHandler) PasskeyBegin(c *gin.Context) {
-	c.JSON(http.StatusNotImplemented, gin.H{"error": "Passkey registration/login is not configured yet"})
+func (h *AuthHandler) Register(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid registration payload"})
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	password := strings.TrimSpace(req.Password)
+	name := strings.TrimSpace(req.Name)
+	if email == "" || !strings.Contains(email, "@") {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "enter a valid email address"})
+		return
+	}
+	if len(password) < 8 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "password must be at least 8 characters"})
+		return
+	}
+	if name == "" {
+		name = strings.TrimSpace(strings.Split(email, "@")[0])
+	}
+	if name == "" {
+		name = "Local User"
+	}
+	if _, _, err := h.store.GetLocalUserByEmail(email); err == nil {
+		c.JSON(http.StatusConflict, gin.H{"error": "an account with that email already exists"})
+		return
+	} else if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not check account"})
+		return
+	}
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not secure password"})
+		return
+	}
+	user, err := h.store.CreateLocalUser(email, name, string(hash))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create account"})
+		return
+	}
+	h.issueSession(c, user)
+}
+
+func (h *AuthHandler) Login(c *gin.Context) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid login payload"})
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(req.Email))
+	password := strings.TrimSpace(req.Password)
+	if email == "" || password == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "enter email and password"})
+		return
+	}
+	user, hash, err := h.store.GetLocalUserByEmail(email)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load account"})
+		return
+	}
+	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+		return
+	}
+	h.issueSession(c, user)
 }
 
 func (h *AuthHandler) DevLogin(c *gin.Context) {
@@ -105,6 +181,17 @@ func (h *AuthHandler) DevLogin(c *gin.Context) {
 	}
 	auth.SetSessionCookie(c, session.Token, session.ExpiresAt, h.cfg.CookieSecure)
 	c.JSON(http.StatusOK, model.AuthSession{Authenticated: true, Required: false, User: &user})
+}
+
+func (h *AuthHandler) issueSession(c *gin.Context, user model.User) {
+	expiresAt := time.Now().UTC().Add(auth.SessionDuration)
+	session, err := h.store.CreateSession(user.ID, expiresAt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create session"})
+		return
+	}
+	auth.SetSessionCookie(c, session.Token, session.ExpiresAt, h.cfg.CookieSecure)
+	c.JSON(http.StatusOK, model.AuthSession{Authenticated: true, Required: h.cfg.AuthRequired, User: &user})
 }
 
 func (h *AuthHandler) Logout(c *gin.Context) {

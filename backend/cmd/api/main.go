@@ -37,10 +37,6 @@ func main() {
 	miscH := handler.NewMiscHandler(cfg, pricerClient)
 	marketH := handler.NewMarketHandler(cfg)
 	pricesWSH := handler.NewPricesWSHandler(cfg, pricerClient)
-	passkeyH, err := handler.NewPasskeyHandler(cfg, store, store)
-	if err != nil {
-		log.Fatalf("passkey: %v", err)
-	}
 
 	r := gin.New()
 	r.Use(gin.Recovery())
@@ -56,12 +52,10 @@ func main() {
 	// Auth
 	api.GET("/auth/session", authH.Session)
 	api.GET("/auth/providers", authH.Providers)
+	api.POST("/auth/register", authH.Register)
+	api.POST("/auth/login", authH.Login)
 	api.POST("/auth/google", authH.Google)
 	api.POST("/auth/apple", authH.Apple)
-	api.POST("/auth/passkey/register/begin", passkeyH.RegisterBegin)
-	api.POST("/auth/passkey/register/finish", passkeyH.RegisterFinish)
-	api.POST("/auth/passkey/login/begin", passkeyH.LoginBegin)
-	api.POST("/auth/passkey/login/finish", passkeyH.LoginFinish)
 	api.POST("/auth/dev", authH.DevLogin)
 	api.POST("/auth/logout", authH.Logout)
 

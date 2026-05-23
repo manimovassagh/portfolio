@@ -63,6 +63,20 @@ async function postJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+async function postJsonBody<T>(url: string, body: unknown): Promise<T> {
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(detail?.error || `${url} failed with HTTP ${response.status}`);
+  }
+  return response.json() as Promise<T>;
+}
+
 export async function getAuthSession(): Promise<AuthSession> {
   const raw = await getJson<unknown>('/api/auth/session');
   return AuthSessionSchema.parse(raw) as AuthSession;
@@ -184,6 +198,16 @@ export async function loginWithPasskey(): Promise<AuthSession> {
     throw new Error(err?.error || 'Passkey login failed');
   }
   return AuthSessionSchema.parse(await finish.json()) as AuthSession;
+}
+
+export async function registerWithEmail(email: string, password: string, name?: string): Promise<AuthSession> {
+  const raw = await postJsonBody<unknown>('/api/auth/register', { email, password, name });
+  return AuthSessionSchema.parse(raw) as AuthSession;
+}
+
+export async function loginWithEmail(email: string, password: string): Promise<AuthSession> {
+  const raw = await postJsonBody<unknown>('/api/auth/login', { email, password });
+  return AuthSessionSchema.parse(raw) as AuthSession;
 }
 
 export async function loginInDevMode(username?: string): Promise<AuthSession> {

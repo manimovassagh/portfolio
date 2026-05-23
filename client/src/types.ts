@@ -19,6 +19,7 @@ export type AuthSession = {
 
 export type AuthProviders = {
   providers: {
+    local: boolean;
     google: boolean;
     apple: boolean;
     passkey: boolean;
