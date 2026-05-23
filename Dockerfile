@@ -1,22 +1,51 @@
-# Stage 1: build the React frontend
-FROM node:26-slim AS frontend
+FROM node:26-slim AS frontend-builder
 WORKDIR /app
-COPY package*.json ./
-RUN npm ci
-COPY index.html vite.config.ts tailwind.config.js postcss.config.js tsconfig.json ./
-COPY src ./src
-RUN npm run build
+COPY client/package.json client/package-lock.json client/
+RUN cd client && npm ci
+COPY client/ client/
+ARG VITE_PUBLIC_DEMO=false
+ENV VITE_PUBLIC_DEMO=${VITE_PUBLIC_DEMO}
+RUN cd client && npm run build
 
-# Stage 2: Python runtime
-FROM python:3.14-slim
+FROM golang:1.26-alpine AS backend-builder
 WORKDIR /app
-RUN pip install uv --no-cache-dir
+COPY backend/go.mod backend/go.sum ./backend/
+RUN cd backend && go mod download
+COPY backend/ ./backend/
+RUN cd backend && CGO_ENABLED=0 go build -o /kapital ./cmd/api
+
+FROM ghcr.io/astral-sh/uv:0.7.9 AS uv-binary
+
+FROM python:3.13-slim
+WORKDIR /app
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      bash \
+      ca-certificates \
+      curl \
+      gettext-base \
+      nginx \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=uv-binary /uv /usr/local/bin/uv
 COPY pyproject.toml uv.lock ./
 RUN uv sync --frozen --no-dev
-COPY api.py ./
-COPY app ./app
-COPY portfolio ./portfolio
-COPY exports/sample-portfolio.csv ./exports/sample-portfolio.csv
-COPY --from=frontend /app/static ./static
-EXPOSE 8000
-CMD uv run uvicorn api:app --host 0.0.0.0 --port ${PORT:-8000}
+
+COPY pricer/ ./pricer/
+COPY --from=backend-builder /kapital /kapital
+COPY --from=frontend-builder /app/client/dist /usr/share/nginx/html
+RUN mkdir -p /app/exports
+COPY exports/sample-portfolio.csv /app/exports/sample-portfolio.csv
+COPY render-nginx.conf.template /etc/nginx/templates/default.conf.template
+COPY render-entrypoint.sh /app/render-entrypoint.sh
+
+RUN chmod +x /app/render-entrypoint.sh
+
+EXPOSE 10000
+ENV PORT=10000 \
+    BACKEND_PORT=8766 \
+    PRICER_PORT=8001 \
+    EXPORTS_DIR=/app/exports
+
+CMD ["/app/render-entrypoint.sh"]

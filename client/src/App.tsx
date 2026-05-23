@@ -79,6 +79,7 @@ function marketStatus(now: Date) {
 }
 
 export default function App() {
+  const publicDemo                 = import.meta.env.VITE_PUBLIC_DEMO === 'true';
   const queryClient                 = useQueryClient();
   const [dark, setDark]             = useState(() => localStorage.getItem('theme') !== 'light');
   const routerNavigate              = useNavigate();
@@ -106,6 +107,7 @@ export default function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
+  const visibleSections             = publicDemo ? sections.filter((section) => section.id !== 'watchlist') : sections;
 
   const livePrices = useLivePrices(exportName || null);
 
@@ -119,6 +121,12 @@ export default function App() {
   }, [active]);
 
   useEffect(() => {
+    if (publicDemo) {
+      setAuthSession({ authenticated: false, required: false, user: null });
+      setAuthLoading(false);
+      return;
+    }
+
     let mounted = true;
     getAuthSession()
       .then((session) => { if (mounted) setAuthSession(session); })
@@ -127,7 +135,7 @@ export default function App() {
       })
       .finally(() => { if (mounted) setAuthLoading(false); });
     return () => { mounted = false; };
-  }, []);
+  }, [publicDemo]);
 
   useEffect(() => {
     if (location.pathname === '/') {
@@ -316,9 +324,11 @@ export default function App() {
           {active === 'realized'  && <RealizedView data={data} />}
           {active === 'tax'       && <TaxView data={data} exportName={exportName} />}
           {active === 'watchlist' && (
-            authSession?.authenticated
-              ? <WatchlistView exportName={exportName} />
-              : <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+            publicDemo
+              ? <EmptyState message="Watchlist is disabled in the public demo." />
+              : authSession?.authenticated
+                ? <WatchlistView exportName={exportName} />
+                : <AuthScreen embedded onAuthenticated={acceptAuthSession} />
           )}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
@@ -345,15 +355,19 @@ export default function App() {
             <nav className="hidden min-w-0 flex-1 items-center justify-start gap-0.5 xl:flex">
               {NAV_GROUPS.map((group) => {
                 const isGroupActive = group.items.includes(active);
-                const isSingle = group.items.length === 1;
                 const GroupIcon = group.icon;
+                const items = group.items.filter((id) => !publicDemo || id !== 'watchlist');
                 const baseBtn = `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition`;
                 const activeClass = `${baseBtn} bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white`;
                 const inactiveClass = `${baseBtn} text-slate-500 hover:bg-black/5 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-white`;
 
-                if (isSingle) {
+                if (items.length === 0) {
+                  return null;
+                }
+
+                if (items.length === 1) {
                   return (
-                    <NavLink key={group.label} to={sectionHref(group.items[0])} className={isGroupActive ? activeClass : inactiveClass}>
+                    <NavLink key={group.label} to={sectionHref(items[0])} className={isGroupActive ? activeClass : inactiveClass}>
                       <GroupIcon size={16} />{group.label}
                     </NavLink>
                   );
@@ -381,7 +395,7 @@ export default function App() {
                     {openGroup === group.label && (
                       <div className="absolute left-0 top-full z-50 w-48 pt-1.5">
                       <div className="overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl dark:border-slate-700 dark:bg-[#1e1e1e]" role="menu">
-                        {group.items.map((sectionId) => {
+                        {items.map((sectionId) => {
                           const sec = sections.find((s) => s.id === sectionId)!;
                           const SecIcon = sec.icon;
                           return (
@@ -455,9 +469,9 @@ export default function App() {
                 >
                   {dark ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
-                {authLoading ? (
+                {!publicDemo && authLoading ? (
                   <div className="hidden h-10 w-24 animate-pulse rounded-md bg-slate-200 md:block dark:bg-[#333]" />
-                ) : authSession?.authenticated ? (
+                ) : !publicDemo && authSession?.authenticated ? (
                   <div className="hidden items-center gap-2 md:flex">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#333] dark:text-slate-300" title={accountName || 'Account'}>
                       {initials ? <span className="text-xs font-black">{initials}</span> : <User size={18} />}
@@ -471,14 +485,14 @@ export default function App() {
                       <LogOut size={16} />
                     </button>
                   </div>
-                ) : (
+                ) : !publicDemo ? (
                   <button
                     onClick={() => setAuthPromptOpen(true)}
                     className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50 md:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
                   >
                     <User size={16} /> Sign in
                   </button>
-                )}
+                ) : null}
               </div>
             </div>
         </header>
@@ -488,7 +502,7 @@ export default function App() {
             <div className="fixed inset-0 top-[68px] z-40 bg-black/40 backdrop-blur-sm xl:hidden" onClick={() => setMobileMenuOpen(false)} aria-hidden="true" />
             <div id="mobile-nav" ref={mobileMenuRef} className="fixed inset-x-0 top-[68px] z-50 border-b border-black/10 bg-white/98 backdrop-blur-xl xl:hidden dark:border-[#2b2b2b] dark:bg-[#242424]/99">
               <nav className="mx-auto flex max-w-[1580px] flex-col gap-1 px-5 py-3 lg:px-8" aria-label="Mobile navigation">
-                {sections.map(({ id, label, icon: Icon }) => (
+                {visibleSections.map(({ id, label, icon: Icon }) => (
                   <NavLink
                     key={id}
                     to={sectionHref(id)}
@@ -547,7 +561,7 @@ export default function App() {
         </main>
 
       {modal && <AssetModal asset={modal} onClose={closeAsset} />}
-      {authPromptOpen && (
+      {authPromptOpen && !publicDemo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm" onMouseDown={() => setAuthPromptOpen(false)}>
           <div onMouseDown={(event) => event.stopPropagation()}>
             <AuthScreen embedded onAuthenticated={acceptAuthSession} />

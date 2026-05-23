@@ -100,6 +100,22 @@ After `make docker`:
 
 Place your CSV exports in `exports/` before starting — they are volume-mounted.
 
+### Public demo container
+
+The repository root also contains a single-container Docker build for free hosting on Render.
+
+- Uses the bundled `exports/sample-portfolio.csv` seed only
+- Does not require login or persisted watchlist data
+- Accepts CSV uploads at runtime, but the container filesystem is ephemeral
+- Render terminates TLS, so the deployed service is served over HTTPS
+
+Build locally with:
+
+```bash
+docker build --build-arg VITE_PUBLIC_DEMO=true -t portfolio-render-demo -f Dockerfile .
+docker run --rm -p 10000:10000 portfolio-render-demo
+```
+
 ---
 
 ## CI and releases
