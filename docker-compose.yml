@@ -22,9 +22,12 @@ services:
     ports:
       - "8766:8766"
     environment:
+      - GIN_MODE=release
       - PRICER_URL=http://pricer:8001
       - EXPORTS_DIR=/data/exports
       - DB_PATH=/data/kapital.db
+      - TLS_CERT=/app/certs/cert.pem
+      - TLS_KEY=/app/certs/key.pem
     volumes:
       - ./exports:/data/exports
       - kapital-db:/data
@@ -34,7 +37,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8766/api/readyz"]
+      test: ["CMD", "wget", "--no-check-certificate", "-qO-", "https://localhost:8766/api/readyz"]
       interval: 10s
       timeout: 5s
       retries: 3
