@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
-	"github.com/manimovassagh/portfolio/internal/loader"
 	"github.com/manimovassagh/portfolio/internal/pricer"
 	"github.com/manimovassagh/portfolio/internal/service"
 )
@@ -31,7 +30,7 @@ func (h *MiscHandler) PositionReturns(c *gin.Context) {
 }
 
 func (h *MiscHandler) Performance(c *gin.Context) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -84,7 +83,7 @@ func (h *MiscHandler) Performance(c *gin.Context) {
 
 // Geographic returns portfolio value grouped by issuing country from ISIN prefix.
 func (h *MiscHandler) Geographic(c *gin.Context) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusOK, gin.H{"countries": []gin.H{}})
 		return
@@ -146,7 +145,7 @@ func isoCountryName(code string) string {
 
 // FSA computes the German Freistellungsauftrag (tax-free allowance) usage.
 func (h *MiscHandler) FSA(c *gin.Context) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -204,7 +203,7 @@ func (h *MiscHandler) FSA(c *gin.Context) {
 
 // DividendCalendar returns upcoming dividends based on past dividend history.
 func (h *MiscHandler) DividendCalendar(c *gin.Context) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return
@@ -254,6 +253,11 @@ const maxUploadBytes = 10 * 1024 * 1024
 
 // Upload accepts a CSV export file and saves it to the exports directory.
 func (h *MiscHandler) Upload(c *gin.Context) {
+	userID := currentUserID(c)
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "sign in required"})
+		return
+	}
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "missing file"})
@@ -281,20 +285,21 @@ func (h *MiscHandler) Upload(c *gin.Context) {
 		return
 	}
 
-	if err := os.MkdirAll(h.cfg.ExportsDir, 0o755); err != nil {
+	userDir := userScopeDir(h.cfg, userID)
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot create exports dir"})
 		return
 	}
-	dest := filepath.Join(h.cfg.ExportsDir, name)
+	dest := filepath.Join(userDir, name)
 	if err := os.WriteFile(dest, data, 0o644); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "write failed"})
 		return
 	}
 
-	paths := loader.ListExports(h.cfg.ExportsDir)
-	names := make([]string, len(paths))
-	for i, p := range paths {
-		names[i] = filepath.Base(p)
+	names, err := listUserExports(h.cfg, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"filename": name, "exports": names})
 }

@@ -2,8 +2,11 @@ package handler
 
 import (
 	"database/sql"
+	"errors"
+	"io"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -65,7 +68,31 @@ func (h *AuthHandler) DevLogin(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "dev login is disabled when AUTH_REQUIRED=true"})
 		return
 	}
-	user, err := h.store.CreateUser("dev", "local", "local@kapital.dev", "Local User")
+	var req struct {
+		Username string `json:"username"`
+	}
+	username := strings.TrimSpace(c.GetHeader("X-Username"))
+	if username == "" {
+		username = strings.TrimSpace(c.Query("username"))
+	}
+	if username == "" {
+		if err := c.ShouldBindJSON(&req); err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid dev login payload"})
+			return
+		}
+		username = strings.TrimSpace(req.Username)
+	}
+	displayName := username
+	if displayName == "" {
+		displayName = "Local User"
+	}
+	subject := strings.ToLower(username)
+	if subject == "" {
+		subject = "local"
+	}
+	subject = strings.NewReplacer(":", "_", "/", "_", "\\", "_", " ", "_").Replace(subject)
+
+	user, err := h.store.CreateUser("dev", subject, "local@kapital.dev", displayName)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create dev user"})
 		return

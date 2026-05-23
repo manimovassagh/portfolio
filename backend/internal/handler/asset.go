@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
-	"github.com/manimovassagh/portfolio/internal/loader"
 	"github.com/manimovassagh/portfolio/internal/model"
 	"github.com/manimovassagh/portfolio/internal/pricer"
 	"github.com/manimovassagh/portfolio/internal/service"
@@ -23,7 +22,7 @@ func NewAssetHandler(cfg config.Config, p *pricer.Client) *AssetHandler {
 
 func (h *AssetHandler) Get(c *gin.Context) {
 	isin := c.Param("isin")
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

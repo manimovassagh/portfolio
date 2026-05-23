@@ -26,7 +26,8 @@ func NewWatchlistHandler(store *db.Store, p *pricer.Client) *WatchlistHandler {
 }
 
 func (h *WatchlistHandler) Get(c *gin.Context) {
-	items, err := h.store.GetWatchlist()
+	userID := currentUserID(c)
+	items, err := h.store.GetWatchlist(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -78,6 +79,7 @@ func distToTarget(it model.WatchlistItem) float64 {
 }
 
 func (h *WatchlistHandler) Add(c *gin.Context) {
+	userID := currentUserID(c)
 	var item model.WatchlistItem
 	if err := c.ShouldBindJSON(&item); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -103,11 +105,11 @@ func (h *WatchlistHandler) Add(c *gin.Context) {
 	if item.AddedDate == "" {
 		item.AddedDate = time.Now().Format("2006-01-02")
 	}
-	if err := h.store.AddWatchlistItem(item); err != nil {
+	if err := h.store.AddWatchlistItem(userID, item); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	items, err := h.store.GetWatchlist()
+	items, err := h.store.GetWatchlist(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -116,16 +118,17 @@ func (h *WatchlistHandler) Add(c *gin.Context) {
 }
 
 func (h *WatchlistHandler) Remove(c *gin.Context) {
+	userID := currentUserID(c)
 	isin := strings.ToUpper(strings.TrimSpace(c.Param("isin")))
 	if isin == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "isin is required"})
 		return
 	}
-	if err := h.store.RemoveWatchlistItem(isin); err != nil {
+	if err := h.store.RemoveWatchlistItem(userID, isin); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	items, err := h.store.GetWatchlist()
+	items, err := h.store.GetWatchlist(userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return

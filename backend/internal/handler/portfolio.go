@@ -6,7 +6,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
-	"github.com/manimovassagh/portfolio/internal/loader"
 	"github.com/manimovassagh/portfolio/internal/model"
 	"github.com/manimovassagh/portfolio/internal/pricer"
 	"github.com/manimovassagh/portfolio/internal/service"
@@ -31,7 +30,7 @@ func NewPortfolioHandler(cfg config.Config, p *pricer.Client) *PortfolioHandler 
 }
 
 func (h *PortfolioHandler) Overview(c *gin.Context) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -53,7 +52,7 @@ func (h *PortfolioHandler) Overview(c *gin.Context) {
 }
 
 func (h *PortfolioHandler) Summary(c *gin.Context) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
 		return

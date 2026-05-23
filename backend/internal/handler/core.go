@@ -3,11 +3,9 @@ package handler
 import (
 	"net/http"
 	"os"
-	"path/filepath"
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
-	"github.com/manimovassagh/portfolio/internal/loader"
 )
 
 type CoreHandler struct {
@@ -57,10 +55,15 @@ func (h *CoreHandler) Readyz(c *gin.Context) {
 }
 
 func (h *CoreHandler) Exports(c *gin.Context) {
-	paths := loader.ListExports(h.cfg.ExportsDir)
-	names := make([]string, len(paths))
-	for i, p := range paths {
-		names[i] = filepath.Base(p)
+	userID := currentUserID(c)
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "sign in required"})
+		return
+	}
+	names, err := listUserExports(h.cfg, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
 	}
 	c.JSON(http.StatusOK, gin.H{"exports": names})
 }

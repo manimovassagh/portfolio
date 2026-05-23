@@ -14,6 +14,7 @@ func TestWatchlistCRUD(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
+	const userID = "user-1"
 	item := model.WatchlistItem{
 		ISIN:      "TEST123",
 		Ticker:    "TEST",
@@ -21,11 +22,11 @@ func TestWatchlistCRUD(t *testing.T) {
 		Notes:     "my note",
 		AddedDate: "2026-05-21",
 	}
-	if err := store.AddWatchlistItem(item); err != nil {
+	if err := store.AddWatchlistItem(userID, item); err != nil {
 		t.Fatalf("add failed: %v", err)
 	}
 
-	list, err := store.GetWatchlist()
+	list, err := store.GetWatchlist(userID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -33,11 +34,11 @@ func TestWatchlistCRUD(t *testing.T) {
 		t.Fatalf("expected 1 item with ISIN TEST123, got %+v", list)
 	}
 
-	if err := store.RemoveWatchlistItem("TEST123"); err != nil {
+	if err := store.RemoveWatchlistItem(userID, "TEST123"); err != nil {
 		t.Fatalf("remove failed: %v", err)
 	}
 
-	list, _ = store.GetWatchlist()
+	list, _ = store.GetWatchlist(userID)
 	if len(list) != 0 {
 		t.Fatal("expected empty watchlist after remove")
 	}

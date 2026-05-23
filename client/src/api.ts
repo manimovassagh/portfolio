@@ -186,8 +186,19 @@ export async function loginWithPasskey(): Promise<AuthSession> {
   return AuthSessionSchema.parse(await finish.json()) as AuthSession;
 }
 
-export async function loginInDevMode(): Promise<AuthSession> {
-  const raw = await postJson<unknown>('/api/auth/dev');
+export async function loginInDevMode(username?: string): Promise<AuthSession> {
+  const url = username ? `/api/auth/dev?username=${encodeURIComponent(username)}` : '/api/auth/dev';
+  const response = await fetch(url, {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: username ? { 'Content-Type': 'application/json' } : undefined,
+    body: username ? JSON.stringify({ username }) : undefined,
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(detail?.error || `'/api/auth/dev' failed with HTTP ${response.status}`);
+  }
+  const raw = await response.json() as unknown;
   return AuthSessionSchema.parse(raw) as AuthSession;
 }
 

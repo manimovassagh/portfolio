@@ -25,7 +25,7 @@ The repo ships with `exports/sample-portfolio.csv` so you can run immediately wi
 - **Realized P&L** — closed-trade history with per-trade gain/loss
 - **Rebalance** — enter target weights, get suggested buy/sell amounts
 - **Goals / FIRE** — FIRE number calculator and 10-year projection
-- **Watchlist** — persisted watchlist with target prices (SQLite)
+- **Watchlist** — persisted watchlist with target prices, scoped per signed-in user (SQLite)
 - **Markets** — search, quote, history chart, news for any ticker
 
 ---
@@ -81,7 +81,8 @@ make exports    List CSV files in exports/
 
 1. In Trade Republic: **Settings → Export → Transaction history** → download CSV.
 2. Drop the file into `exports/`, or use the **Import** button in the app header.
-3. If multiple exports exist, pick one from the header dropdown.
+3. Sign in first, then use the **Import** button in the app header.
+4. Each signed-in user gets their own export folder; the bundled `sample-portfolio.csv` seeds a fresh account.
 
 ---
 
@@ -100,14 +101,13 @@ After `make docker`:
 
 Place your CSV exports in `exports/` before starting — they are volume-mounted.
 
-### Public demo container
+### Single-container deploy
 
-The repository root also contains a single-container Docker build for free hosting on Render.
+The repository root also contains a single-container Docker build for hosts that want one image for the UI, API, and pricer.
 
-- Uses the bundled `exports/sample-portfolio.csv` seed only
-- Does not require login or persisted watchlist data
-- Accepts CSV uploads at runtime, but the container filesystem is ephemeral
-- Render terminates TLS, so the deployed service is served over HTTPS
+- The app is authenticated by default
+- CSV uploads and watchlist data are scoped per signed-in user
+- Render or another proxy terminates TLS, so the container only needs to listen on its internal port
 
 Build locally with:
 

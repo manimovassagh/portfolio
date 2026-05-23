@@ -10,7 +10,6 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"github.com/manimovassagh/portfolio/internal/config"
-	"github.com/manimovassagh/portfolio/internal/loader"
 	"github.com/manimovassagh/portfolio/internal/pricer"
 )
 
@@ -103,7 +102,7 @@ func (h *PricesWSHandler) resolveISINs(c *gin.Context) []string {
 		return out
 	}
 
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		log.Printf("ws/prices: export not found: %v", err)
 		return nil

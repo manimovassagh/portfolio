@@ -36,12 +36,24 @@ func (s *Store) Ping() error { return s.db.Ping() }
 
 func (s *Store) migrate() error {
 	_, err := s.db.Exec(`CREATE TABLE IF NOT EXISTS watchlist (
+		user_id      TEXT NOT NULL DEFAULT '',
 		isin         TEXT PRIMARY KEY,
 		ticker       TEXT NOT NULL DEFAULT '',
 		name         TEXT NOT NULL DEFAULT '',
 		notes        TEXT NOT NULL DEFAULT '',
 		target_price REAL,
 		added_date   TEXT NOT NULL
+	);
+	CREATE TABLE IF NOT EXISTS user_watchlist (
+		user_id      TEXT NOT NULL,
+		isin         TEXT NOT NULL,
+		ticker       TEXT NOT NULL DEFAULT '',
+		name         TEXT NOT NULL DEFAULT '',
+		notes        TEXT NOT NULL DEFAULT '',
+		target_price REAL,
+		added_date   TEXT NOT NULL,
+		PRIMARY KEY (user_id, isin),
+		FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 	CREATE TABLE IF NOT EXISTS users (
 		id               TEXT PRIMARY KEY,
@@ -69,9 +81,9 @@ func (s *Store) migrate() error {
 	return err
 }
 
-func (s *Store) GetWatchlist() ([]model.WatchlistItem, error) {
+func (s *Store) GetWatchlist(userID string) ([]model.WatchlistItem, error) {
 	rows, err := s.db.Query(
-		`SELECT isin, ticker, name, notes, target_price, added_date FROM watchlist ORDER BY added_date DESC`)
+		`SELECT isin, ticker, name, notes, target_price, added_date FROM user_watchlist WHERE user_id = ? ORDER BY added_date DESC`, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,16 +104,16 @@ func (s *Store) GetWatchlist() ([]model.WatchlistItem, error) {
 	return items, rows.Err()
 }
 
-func (s *Store) AddWatchlistItem(item model.WatchlistItem) error {
+func (s *Store) AddWatchlistItem(userID string, item model.WatchlistItem) error {
 	_, err := s.db.Exec(
-		`INSERT OR REPLACE INTO watchlist (isin, ticker, name, notes, target_price, added_date)
-		 VALUES (?, ?, ?, ?, ?, ?)`,
-		item.ISIN, item.Ticker, item.Name, item.Notes, item.TargetPrice, item.AddedDate)
+		`INSERT OR REPLACE INTO user_watchlist (user_id, isin, ticker, name, notes, target_price, added_date)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		userID, item.ISIN, item.Ticker, item.Name, item.Notes, item.TargetPrice, item.AddedDate)
 	return err
 }
 
-func (s *Store) RemoveWatchlistItem(isin string) error {
-	_, err := s.db.Exec(`DELETE FROM watchlist WHERE isin = ?`, isin)
+func (s *Store) RemoveWatchlistItem(userID, isin string) error {
+	_, err := s.db.Exec(`DELETE FROM user_watchlist WHERE user_id = ? AND isin = ?`, userID, isin)
 	return err
 }
 

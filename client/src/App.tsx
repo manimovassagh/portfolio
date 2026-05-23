@@ -79,7 +79,6 @@ function marketStatus(now: Date) {
 }
 
 export default function App() {
-  const publicDemo                 = import.meta.env.VITE_PUBLIC_DEMO === 'true';
   const queryClient                 = useQueryClient();
   const [dark, setDark]             = useState(() => localStorage.getItem('theme') !== 'light');
   const routerNavigate              = useNavigate();
@@ -107,7 +106,8 @@ export default function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
-  const visibleSections             = publicDemo ? sections.filter((section) => section.id !== 'watchlist') : sections;
+  const visibleSections             = sections;
+  const authenticated               = !!authSession?.authenticated;
 
   const livePrices = useLivePrices(exportName || null);
 
@@ -121,12 +121,6 @@ export default function App() {
   }, [active]);
 
   useEffect(() => {
-    if (publicDemo) {
-      setAuthSession({ authenticated: false, required: false, user: null });
-      setAuthLoading(false);
-      return;
-    }
-
     let mounted = true;
     getAuthSession()
       .then((session) => { if (mounted) setAuthSession(session); })
@@ -135,7 +129,7 @@ export default function App() {
       })
       .finally(() => { if (mounted) setAuthLoading(false); });
     return () => { mounted = false; };
-  }, [publicDemo]);
+  }, []);
 
   useEffect(() => {
     if (location.pathname === '/') {
@@ -200,6 +194,13 @@ export default function App() {
   }, [exportName, liveRefresh, loadByName]);
 
   useEffect(() => {
+    if (!authenticated) {
+      setLoading(false);
+      setData(null);
+      setExports([]);
+      setExportName('');
+      return;
+    }
     let mounted = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
@@ -222,7 +223,7 @@ export default function App() {
         setLoading(false);
       });
     return () => { mounted = false; };
-  }, [clearExportParam, exportParam, loadByName]);
+  }, [authenticated, clearExportParam, exportParam, loadByName]);
 
   const openAsset = useCallback((holding: Holding) => {
     routerNavigate({ pathname: `/holdings/${encodeURIComponent(holding.isin)}`, search: cleanSearch });
@@ -275,6 +276,10 @@ export default function App() {
   const handleLogout = async () => {
     await logout().catch(() => {});
     setAuthSession({ authenticated: false, required: true, user: null });
+    setData(null);
+    setExports([]);
+    setExportName('');
+    setLoading(false);
   };
 
   const acceptAuthSession = useCallback((session: AuthSession) => {
@@ -312,6 +317,7 @@ export default function App() {
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
   const market = marketStatus(lastUpdated || new Date());
   const routeContent = useMemo(() => {
+    if (!authenticated) return null;
     if (!data) return null;
     return (
       <ErrorBoundary>
@@ -324,11 +330,9 @@ export default function App() {
           {active === 'realized'  && <RealizedView data={data} />}
           {active === 'tax'       && <TaxView data={data} exportName={exportName} />}
           {active === 'watchlist' && (
-            publicDemo
-              ? <EmptyState message="Watchlist is disabled in the public demo." />
-              : authSession?.authenticated
-                ? <WatchlistView exportName={exportName} />
-                : <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+            authenticated
+              ? <WatchlistView exportName={exportName} />
+              : <AuthScreen embedded allowDevLogin={!authLoading && !authSession?.required} onAuthenticated={acceptAuthSession} />
           )}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
@@ -336,7 +340,15 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
     );
-  }, [acceptAuthSession, active, authSession?.authenticated, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
+  }, [acceptAuthSession, active, authenticated, authSession?.required, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
+
+  const authView = !authenticated ? (
+    <AuthScreen onAuthenticated={acceptAuthSession} allowDevLogin={!authLoading && !authSession?.required} />
+  ) : null;
+
+  if (authView) {
+    return authView;
+  }
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-black dark:text-slate-100">
@@ -356,7 +368,7 @@ export default function App() {
               {NAV_GROUPS.map((group) => {
                 const isGroupActive = group.items.includes(active);
                 const GroupIcon = group.icon;
-                const items = group.items.filter((id) => !publicDemo || id !== 'watchlist');
+                const items = group.items;
                 const baseBtn = `inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm font-semibold transition`;
                 const activeClass = `${baseBtn} bg-black/5 text-slate-950 dark:bg-white/8 dark:text-white`;
                 const inactiveClass = `${baseBtn} text-slate-500 hover:bg-black/5 hover:text-slate-950 dark:text-slate-400 dark:hover:bg-white/8 dark:hover:text-white`;
@@ -469,9 +481,9 @@ export default function App() {
                 >
                   {dark ? <Sun size={16} /> : <Moon size={16} />}
                 </button>
-                {!publicDemo && authLoading ? (
+                {authLoading ? (
                   <div className="hidden h-10 w-24 animate-pulse rounded-md bg-slate-200 md:block dark:bg-[#333]" />
-                ) : !publicDemo && authSession?.authenticated ? (
+                ) : authenticated ? (
                   <div className="hidden items-center gap-2 md:flex">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#333] dark:text-slate-300" title={accountName || 'Account'}>
                       {initials ? <span className="text-xs font-black">{initials}</span> : <User size={18} />}
@@ -485,14 +497,14 @@ export default function App() {
                       <LogOut size={16} />
                     </button>
                   </div>
-                ) : !publicDemo ? (
+                ) : (
                   <button
                     onClick={() => setAuthPromptOpen(true)}
                     className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50 md:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
                   >
                     <User size={16} /> Sign in
                   </button>
-                ) : null}
+                )}
               </div>
             </div>
         </header>
@@ -561,10 +573,10 @@ export default function App() {
         </main>
 
       {modal && <AssetModal asset={modal} onClose={closeAsset} />}
-      {authPromptOpen && !publicDemo && (
+      {authPromptOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm" onMouseDown={() => setAuthPromptOpen(false)}>
           <div onMouseDown={(event) => event.stopPropagation()}>
-            <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+            <AuthScreen embedded allowDevLogin={!authLoading && !authSession?.required} onAuthenticated={acceptAuthSession} />
           </div>
         </div>
       )}

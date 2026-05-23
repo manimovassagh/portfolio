@@ -20,6 +20,10 @@ func TestWatchlistRejectsMissingISIN(t *testing.T) {
 
 	h := NewWatchlistHandler(store, nil)
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Next()
+	})
 	r.POST("/watchlist", h.Add)
 
 	w := httptest.NewRecorder()
@@ -42,6 +46,10 @@ func TestWatchlistRejectsInvalidISIN(t *testing.T) {
 
 	h := NewWatchlistHandler(store, nil)
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Next()
+	})
 	r.POST("/watchlist", h.Add)
 
 	w := httptest.NewRecorder()
@@ -64,6 +72,10 @@ func TestWatchlistNormalizesTickerAndISIN(t *testing.T) {
 
 	h := NewWatchlistHandler(store, nil)
 	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", "user-1")
+		c.Next()
+	})
 	r.POST("/watchlist", h.Add)
 
 	// US0378331005 is Apple's real ISIN — lowercase input gets normalized to upper.
@@ -76,7 +88,7 @@ func TestWatchlistNormalizesTickerAndISIN(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
 	}
 
-	items, err := store.GetWatchlist()
+	items, err := store.GetWatchlist("user-1")
 	if err != nil {
 		t.Fatal(err)
 	}

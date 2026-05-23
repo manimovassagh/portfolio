@@ -9,7 +9,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
-	"github.com/manimovassagh/portfolio/internal/loader"
 	"github.com/manimovassagh/portfolio/internal/model"
 	"github.com/manimovassagh/portfolio/internal/pricer"
 	"github.com/manimovassagh/portfolio/internal/service"
@@ -24,8 +23,8 @@ func NewHoldingsHandler(cfg config.Config, p *pricer.Client) *HoldingsHandler {
 	return &HoldingsHandler{cfg: cfg, pricer: p}
 }
 
-func (h *HoldingsHandler) loadAndEnrich(exportName string) ([]model.Holding, error) {
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, exportName)
+func (h *HoldingsHandler) loadAndEnrich(userID, exportName string) ([]model.Holding, error) {
+	txs, err := loadUserExport(h.cfg, userID, exportName)
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +42,7 @@ func (h *HoldingsHandler) loadAndEnrich(exportName string) ([]model.Holding, err
 }
 
 func (h *HoldingsHandler) List(c *gin.Context) {
-	holdings, err := h.loadAndEnrich(c.Query("export"))
+	holdings, err := h.loadAndEnrich(currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -69,7 +68,7 @@ func (h *HoldingsHandler) List(c *gin.Context) {
 
 func (h *HoldingsHandler) Detail(c *gin.Context) {
 	isin := c.Param("isin")
-	txs, err := loader.LoadExport(h.cfg.ExportsDir, c.Query("export"))
+	txs, err := loadUserExport(h.cfg, currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
@@ -130,7 +129,7 @@ func (h *HoldingsHandler) Detail(c *gin.Context) {
 }
 
 func (h *HoldingsHandler) Export(c *gin.Context) {
-	holdings, err := h.loadAndEnrich(c.Query("export"))
+	holdings, err := h.loadAndEnrich(currentUserID(c), c.Query("export"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
