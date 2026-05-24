@@ -106,6 +106,8 @@ export default function App() {
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
+  const [importRequested, setImportRequested] = useState(false);
+  const importInputRef               = useRef<HTMLInputElement>(null);
   const visibleSections             = sections;
   const authenticated               = !!authSession?.authenticated;
 
@@ -125,7 +127,7 @@ export default function App() {
     getAuthSession()
       .then((session) => { if (mounted) setAuthSession(session); })
       .catch(() => {
-        if (mounted) setAuthSession({ authenticated: false, required: true, user: null });
+        if (mounted) setAuthSession({ authenticated: false, required: false, user: null });
       })
       .finally(() => { if (mounted) setAuthLoading(false); });
     return () => { mounted = false; };
@@ -194,13 +196,6 @@ export default function App() {
   }, [exportName, liveRefresh, loadByName]);
 
   useEffect(() => {
-    if (!authenticated) {
-      setLoading(false);
-      setData(null);
-      setExports([]);
-      setExportName('');
-      return;
-    }
     let mounted = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
@@ -223,7 +218,7 @@ export default function App() {
         setLoading(false);
       });
     return () => { mounted = false; };
-  }, [authenticated, clearExportParam, exportParam, loadByName]);
+  }, [authSession?.authenticated, clearExportParam, exportParam, loadByName]);
 
   const openAsset = useCallback((holding: Holding) => {
     routerNavigate({ pathname: `/holdings/${encodeURIComponent(holding.isin)}`, search: cleanSearch });
@@ -275,11 +270,11 @@ export default function App() {
 
   const handleLogout = async () => {
     await logout().catch(() => {});
-    setAuthSession({ authenticated: false, required: true, user: null });
+    setAuthSession({ authenticated: false, required: false, user: null });
     setData(null);
     setExports([]);
     setExportName('');
-    setLoading(false);
+    setLoading(true);
   };
 
   const acceptAuthSession = useCallback((session: AuthSession) => {
@@ -287,8 +282,21 @@ export default function App() {
     if (session.authenticated) {
       setAuthPromptOpen(false);
       setError(null);
+      if (importRequested) {
+        setImportRequested(false);
+        window.setTimeout(() => importInputRef.current?.click(), 0);
+      }
     }
-  }, []);
+  }, [importRequested]);
+
+  const openImport = useCallback(() => {
+    if (!authenticated) {
+      setImportRequested(true);
+      setAuthPromptOpen(true);
+      return;
+    }
+    importInputRef.current?.click();
+  }, [authenticated]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -317,7 +325,6 @@ export default function App() {
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
   const market = marketStatus(lastUpdated || new Date());
   const routeContent = useMemo(() => {
-    if (!authenticated) return null;
     if (!data) return null;
     return (
       <ErrorBoundary>
@@ -340,15 +347,7 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
     );
-  }, [acceptAuthSession, active, authenticated, authSession?.required, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
-
-  const authView = !authenticated ? (
-    <AuthScreen onAuthenticated={acceptAuthSession} />
-  ) : null;
-
-  if (authView) {
-    return authView;
-  }
+  }, [acceptAuthSession, active, authenticated, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-black dark:text-slate-100">
@@ -466,10 +465,13 @@ export default function App() {
                     {exports.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
                 )}
-                <label className="hidden h-10 cursor-pointer items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 lg:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]">
+                <button
+                  onClick={openImport}
+                  className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 lg:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
+                  title={authenticated ? 'Import CSV' : 'Sign in to import CSV'}
+                >
                   <Upload size={16} /> Import
-                  <input type="file" accept=".csv" className="hidden" onChange={(e) => handleUpload(e.target.files?.[0])} />
-                </label>
+                </button>
                 <button onClick={() => refresh()} className="inline-flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]">
                   <RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> <span className="hidden sm:inline">Refresh</span>
                 </button>
@@ -525,15 +527,31 @@ export default function App() {
                   </NavLink>
                 ))}
                 <div className="mt-1 border-t border-black/10 pt-2 dark:border-white/10">
-                  <label className="flex cursor-pointer items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white">
+                  <button
+                    type="button"
+                    onClick={() => { setMobileMenuOpen(false); openImport(); }}
+                    className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-sm font-semibold text-slate-500 hover:text-slate-950 dark:text-slate-400 dark:hover:text-white"
+                    title={authenticated ? 'Import CSV' : 'Sign in to import CSV'}
+                  >
                     <Upload size={17} /> Import CSV
-                    <input type="file" accept=".csv" className="hidden" onChange={(e) => { setMobileMenuOpen(false); void handleUpload(e.target.files?.[0]); }} />
-                  </label>
+                  </button>
                 </div>
               </nav>
             </div>
           </>
         )}
+
+          <input
+            ref={importInputRef}
+            type="file"
+            accept=".csv"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.currentTarget.value = '';
+              void handleUpload(file);
+            }}
+          />
 
           <div className="mx-auto max-w-[1580px] space-y-6 px-5 py-8 lg:px-8">
             <div className="flex items-end justify-between gap-4">
@@ -574,7 +592,13 @@ export default function App() {
 
       {modal && <AssetModal asset={modal} onClose={closeAsset} />}
       {authPromptOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm" onMouseDown={() => setAuthPromptOpen(false)}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm"
+          onMouseDown={() => {
+            setAuthPromptOpen(false);
+            setImportRequested(false);
+          }}
+        >
           <div onMouseDown={(event) => event.stopPropagation()}>
             <AuthScreen embedded onAuthenticated={acceptAuthSession} />
           </div>

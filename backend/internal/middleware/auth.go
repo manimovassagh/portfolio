@@ -53,3 +53,23 @@ func RequireSession(cfg config.Config, store auth.SessionStore) gin.HandlerFunc 
 		c.Next()
 	}
 }
+
+func OptionalSession(cfg config.Config, store auth.SessionStore) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		token, err := c.Cookie(auth.CookieName)
+		if err != nil || token == "" {
+			c.Next()
+			return
+		}
+
+		_, user, err := store.GetSession(token, time.Now().UTC())
+		if err != nil {
+			auth.ClearSessionCookie(c, cfg.CookieSecure)
+			c.Next()
+			return
+		}
+
+		c.Set("user_id", user.ID)
+		c.Next()
+	}
+}

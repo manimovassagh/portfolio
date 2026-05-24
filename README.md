@@ -80,9 +80,9 @@ make exports    List CSV files in exports/
 ## Import your data
 
 1. In Trade Republic: **Settings → Export → Transaction history** → download CSV.
-2. Drop the file into `exports/`, or use the **Import** button in the app header.
-3. Create an account or sign in with email and password first, then use the **Import** button in the app header.
-4. Each signed-in user gets their own export folder; the bundled `sample-portfolio.csv` seeds a fresh account.
+2. Open the app and start from the bundled `sample-portfolio.csv` on the home page.
+3. When you click **Import**, the app asks you to sign in with email and password first.
+4. Each signed-in user gets their own export folder; the bundled `sample-portfolio.csv` stays available as the public sample.
 
 ---
 
@@ -105,7 +105,7 @@ Place your CSV exports in `exports/` before starting — they are volume-mounted
 
 The repository root also contains a single-container Docker build for hosts that want one image for the UI, API, and pricer.
 
-- The app uses local email/password accounts for sign-in
+- The app starts on the public sample portfolio and asks for sign-in only when you import CSVs or use persisted data
 - CSV uploads and watchlist data are scoped per signed-in user
 - Render or another proxy terminates TLS, so the container only needs to listen on its internal port
 

@@ -59,41 +59,43 @@ func main() {
 	api.POST("/auth/dev", authH.DevLogin)
 	api.POST("/auth/logout", authH.Logout)
 
-	persisted := api.Group("")
-	persisted.Use(middleware.RequireSession(cfg, store))
+	publicData := api.Group("")
+	publicData.Use(middleware.OptionalSession(cfg, store))
 
-	persisted.GET("/exports", coreH.Exports)
+	publicData.GET("/exports", coreH.Exports)
 
 	// Portfolio summary
-	persisted.GET("/summary", portfolioH.Summary)
-	persisted.GET("/portfolio", portfolioH.Overview)
+	publicData.GET("/summary", portfolioH.Summary)
+	publicData.GET("/portfolio", portfolioH.Overview)
 
 	// Holdings
-	persisted.GET("/holdings", holdingsH.List)
-	persisted.GET("/holdings/export", holdingsH.Export)
-	persisted.GET("/holdings/:isin", holdingsH.Detail)
+	publicData.GET("/holdings", holdingsH.List)
+	publicData.GET("/holdings/export", holdingsH.Export)
+	publicData.GET("/holdings/:isin", holdingsH.Detail)
 
 	// Asset detail (different shape: current.unrealized vs current.unrealized_pnl)
-	persisted.GET("/asset/:isin", assetH.Get)
+	publicData.GET("/asset/:isin", assetH.Get)
 
 	// Financial reports
-	persisted.GET("/position_returns", miscH.PositionReturns)
-	persisted.GET("/performance", middleware.RateLimit(10, 5), miscH.Performance)
-	persisted.GET("/cash_flow", cashFlowH.Get)
-	persisted.GET("/income", incomeH.Get)
-	persisted.GET("/realized", realizedH.Get)
-	persisted.GET("/tax", taxH.Get)
-	persisted.GET("/analytics", middleware.RateLimit(10, 5), analyticsH.Get)
+	publicData.GET("/position_returns", miscH.PositionReturns)
+	publicData.GET("/performance", middleware.RateLimit(10, 5), miscH.Performance)
+	publicData.GET("/cash_flow", cashFlowH.Get)
+	publicData.GET("/income", incomeH.Get)
+	publicData.GET("/realized", realizedH.Get)
+	publicData.GET("/tax", taxH.Get)
+	publicData.GET("/analytics", middleware.RateLimit(10, 5), analyticsH.Get)
 
 	// Geographic & German tax
-	persisted.GET("/geographic", miscH.Geographic)
-	persisted.GET("/fsa", miscH.FSA)
-	persisted.GET("/dividend_calendar", miscH.DividendCalendar)
+	publicData.GET("/geographic", miscH.Geographic)
+	publicData.GET("/fsa", miscH.FSA)
+	publicData.GET("/dividend_calendar", miscH.DividendCalendar)
 
 	// Watchlist
-	persisted.GET("/watchlist", watchlistH.Get)
-	persisted.POST("/watchlist", watchlistH.Add)
-	persisted.DELETE("/watchlist/:isin", watchlistH.Remove)
+	protected := api.Group("")
+	protected.Use(middleware.RequireSession(cfg, store))
+	protected.GET("/watchlist", watchlistH.Get)
+	protected.POST("/watchlist", watchlistH.Add)
+	protected.DELETE("/watchlist/:isin", watchlistH.Remove)
 
 	// Market data (proxied to Python pricer)
 	api.GET("/market/search", middleware.RateLimit(5, 3), marketH.Search)
@@ -102,11 +104,11 @@ func main() {
 	api.GET("/market/news", middleware.RateLimit(5, 3), marketH.News)
 
 	// WebSocket live prices
-	persisted.GET("/ws/prices", pricesWSH.Stream)
+	publicData.GET("/ws/prices", pricesWSH.Stream)
 
 	// Actions
-	persisted.POST("/refresh_prices", miscH.RefreshPrices)
-	persisted.POST("/upload", miscH.Upload)
+	publicData.POST("/refresh_prices", miscH.RefreshPrices)
+	protected.POST("/upload", miscH.Upload)
 
 	// Docs (outside /api group — no auth required)
 	r.GET("/docs", coreH.DocsUI)

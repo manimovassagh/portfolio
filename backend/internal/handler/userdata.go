@@ -14,6 +14,8 @@ import (
 	"github.com/manimovassagh/portfolio/internal/model"
 )
 
+const guestExportName = "sample-portfolio.csv"
+
 func currentUserID(c *gin.Context) string {
 	if v, ok := c.Get("user_id"); ok {
 		if id, ok := v.(string); ok {
@@ -82,6 +84,9 @@ func copyFile(dst string, src io.Reader) error {
 }
 
 func listUserExports(cfg config.Config, userID string) ([]string, error) {
+	if userID == "" {
+		return []string{guestExportName}, nil
+	}
 	if err := ensureSeedExport(cfg, userID); err != nil {
 		return nil, err
 	}
@@ -102,8 +107,22 @@ func listUserExports(cfg config.Config, userID string) ([]string, error) {
 }
 
 func loadUserExport(cfg config.Config, userID, name string) ([]model.Transaction, error) {
+	if userID == "" {
+		return loadGuestExport(name)
+	}
 	if err := ensureSeedExport(cfg, userID); err != nil {
 		return nil, err
 	}
 	return loader.LoadExport(userScopeDir(cfg, userID), name)
+}
+
+func loadGuestExport(name string) ([]model.Transaction, error) {
+	if name == "" || name == "all" || filepath.Base(name) == guestExportName {
+		seedPath, err := findSeedExportPath()
+		if err != nil {
+			return nil, err
+		}
+		return loader.Load(seedPath)
+	}
+	return nil, fmt.Errorf("sign in required")
 }
