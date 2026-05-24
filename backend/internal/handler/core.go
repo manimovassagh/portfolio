@@ -56,10 +56,6 @@ func (h *CoreHandler) Readyz(c *gin.Context) {
 
 func (h *CoreHandler) Exports(c *gin.Context) {
 	userID := currentUserID(c)
-	if userID == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "sign in required"})
-		return
-	}
 	names, err := listUserExports(h.cfg, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
