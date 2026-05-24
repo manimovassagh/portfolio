@@ -2,6 +2,7 @@ import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } fro
 import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth0 } from '@auth0/auth0-react';
 import { getAuthSession, listExports, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
 import { useLivePrices } from './lib/useLivePrices';
 import { sections } from './lib/sections';
@@ -11,7 +12,7 @@ import { Auth0SessionBridge } from './components/Auth0SessionBridge';
 import { SkeletonDashboard, EmptyState } from './components/ui/Skeleton';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import type { AssetDetail, AuthSession, ChartMode, DashboardData, ExportName, Holding, SectionId } from './types';
-import { auth0Config } from './lib/auth0';
+import { auth0Config, auth0Scopes } from './lib/auth0';
 
 const Overview = lazy(() => import('./components/views/Overview').then((m) => ({ default: m.Overview })));
 const AnalyticsView = lazy(() => import('./components/views/Analytics').then((m) => ({ default: m.AnalyticsView })));
@@ -46,6 +47,8 @@ const sectionPaths: Record<SectionId, string> = {
   goals: '/goals',
   markets: '/markets',
 };
+
+type UploadStage = 'idle' | 'uploading' | 'processing' | 'refreshing';
 
 function sectionFromPath(pathname: string): SectionId {
   const normalized = pathname.replace(/\/+$/, '') || '/';
@@ -82,6 +85,7 @@ function marketStatus(now: Date) {
 
 export default function App() {
   const queryClient                 = useQueryClient();
+  const { loginWithRedirect }       = useAuth0();
   const [dark, setDark]             = useState(() => localStorage.getItem('theme') !== 'light');
   const routerNavigate              = useNavigate();
   const location                    = useLocation();
@@ -101,6 +105,7 @@ export default function App() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState<string | null>(null);
   const [toast, setToast]           = useState<string | null>(null);
+  const [uploadStage, setUploadStage] = useState<UploadStage>('idle');
   const [modal, setModal]           = useState<AssetDetail | null>(null);
   const [chartMode, setChartMode]   = useState<ChartMode>('Value');
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
@@ -152,6 +157,24 @@ export default function App() {
       return next;
     }, { replace });
   }, [setSearchParams]);
+
+  const beginAuth0Login = useCallback(async (returnTo: string, pendingImport = false) => {
+    if (pendingImport) {
+      localStorage.setItem('pendingImport', '1');
+    } else {
+      localStorage.removeItem('pendingImport');
+    }
+    await loginWithRedirect({
+      authorizationParams: {
+        audience: auth0Config.audience,
+        scope: auth0Scopes,
+        redirect_uri: auth0Config.redirectUri,
+      },
+      appState: {
+        returnTo,
+      },
+    });
+  }, [loginWithRedirect]);
 
   const sectionHref = useCallback((id: SectionId) => {
     return `${sectionPaths[id]}${cleanSearch}`;
@@ -258,21 +281,25 @@ export default function App() {
 
   const handleUpload = async (file: File | undefined) => {
     if (!file) return;
+    setUploadStage('uploading');
     setLoading(true);
     setError(null);
     try {
       const payload = await uploadExport(file);
+      setUploadStage('processing');
       setExports(payload.exports);
       setExportName(payload.filename);
       localStorage.setItem('selectedExport', payload.filename);
       clearExportParam();
       setToast(`Loaded ${payload.filename}`);
       window.setTimeout(() => setToast(null), 2800);
+      setUploadStage('refreshing');
       await loadByName(payload.filename);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
       setLoading(false);
+      setUploadStage('idle');
     }
   };
 
@@ -296,7 +323,12 @@ export default function App() {
     if (session.authenticated) {
       setAuthPromptOpen(false);
       setError(null);
-      if (importRequested) {
+      const pendingImport = localStorage.getItem('pendingImport') === '1';
+      if (pendingImport) {
+        localStorage.removeItem('pendingImport');
+        window.setTimeout(() => importInputRef.current?.click(), 0);
+        setImportRequested(false);
+      } else if (importRequested) {
         setImportRequested(false);
         window.setTimeout(() => importInputRef.current?.click(), 0);
       }
@@ -305,12 +337,17 @@ export default function App() {
 
   const openImport = useCallback(() => {
     if (!authenticated) {
+      if (auth0Config.enabled) {
+        setImportRequested(true);
+        void beginAuth0Login(`${window.location.pathname}${window.location.search}`, true);
+        return;
+      }
       setImportRequested(true);
       setAuthPromptOpen(true);
       return;
     }
     importInputRef.current?.click();
-  }, [authenticated]);
+  }, [authenticated, beginAuth0Login]);
 
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
@@ -519,7 +556,13 @@ export default function App() {
                   </div>
                 ) : (
                   <button
-                    onClick={() => setAuthPromptOpen(true)}
+                    onClick={() => {
+                      if (auth0Config.enabled) {
+                        void beginAuth0Login(`${window.location.pathname}${window.location.search}`);
+                        return;
+                      }
+                      setAuthPromptOpen(true);
+                    }}
                     className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50 md:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
                   >
                     <User size={16} /> Sign in
@@ -601,6 +644,50 @@ export default function App() {
               </div>
             )}
             {toast && <div className="fixed bottom-6 right-6 z-50 rounded-lg bg-emerald-500 px-4 py-3 text-sm font-bold text-white shadow-lg">{toast}</div>}
+            {uploadStage !== 'idle' && (
+              <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-5 backdrop-blur-sm">
+                <div className="w-full max-w-md rounded-2xl border border-white/10 bg-[#1f1f1f] p-6 text-slate-100 shadow-2xl">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-[#45b9a8]/15 text-[#74d6c8]">
+                      <RefreshCw size={22} className="animate-spin" />
+                    </div>
+                    <div>
+                      <div className="text-lg font-black">Importing CSV</div>
+                      <div className="text-sm text-slate-400">We are processing the file and rebuilding your dashboard.</div>
+                    </div>
+                  </div>
+                  <div className="mt-5 space-y-3">
+                    {[
+                      { key: 'uploading', label: 'Uploading file', help: 'Sending the CSV to the server.' },
+                      { key: 'processing', label: 'Parsing transactions', help: 'Rebuilding holdings, cash, and performance data.' },
+                      { key: 'refreshing', label: 'Refreshing dashboard', help: 'Loading the updated dashboard.' },
+                    ].map((step, index, steps) => {
+                      const currentIndex = steps.findIndex((item) => item.key === uploadStage);
+                      const stepIndex = index;
+                      const activeStep = uploadStage === step.key;
+                      const complete = currentIndex > stepIndex;
+                      return (
+                        <div key={step.key} className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-black ${
+                            complete
+                              ? 'bg-emerald-500 text-white'
+                              : activeStep
+                                ? 'bg-[#45b9a8] text-black'
+                                : 'bg-white/10 text-slate-500'
+                          }`}>
+                            {complete ? '✓' : activeStep ? '•' : stepIndex + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <div className={`text-sm font-bold ${activeStep ? 'text-white' : 'text-slate-300'}`}>{step.label}</div>
+                            <div className="text-xs text-slate-500">{step.help}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
             {data && loading && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400">Refreshing dashboard data...</div>}
             {!data && loading && <SkeletonDashboard />}
             {!loading && !data && !error && <EmptyState />}
