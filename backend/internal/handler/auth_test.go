@@ -84,7 +84,7 @@ func TestAuthProvidersExposeAuth0Flag(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("expected providers 200, got %d", w.Code)
 	}
-	if !strings.Contains(w.Body.String(), `"local":true`) || !strings.Contains(w.Body.String(), `"auth0":false`) || strings.Contains(w.Body.String(), `"passkey":true`) {
+	if !strings.Contains(w.Body.String(), `"local":false`) || !strings.Contains(w.Body.String(), `"auth0":false`) || strings.Contains(w.Body.String(), `"passkey":true`) {
 		t.Fatalf("unexpected providers payload: %s", w.Body.String())
 	}
 }

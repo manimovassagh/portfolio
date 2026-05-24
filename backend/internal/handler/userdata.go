@@ -34,27 +34,6 @@ func sanitizeScope(value string) string {
 	return replacer.Replace(value)
 }
 
-func ensureSeedExport(cfg config.Config, userID string) error {
-	dir := userScopeDir(cfg, userID)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return err
-	}
-	if paths, err := filepath.Glob(filepath.Join(dir, "*.csv")); err == nil && len(paths) > 0 {
-		return nil
-	}
-
-	seedPath, err := findSeedExportPath()
-	if err != nil {
-		return nil
-	}
-	data, err := os.ReadFile(seedPath)
-	if err != nil {
-		return fmt.Errorf("read seed export: %w", err)
-	}
-	dest := filepath.Join(dir, filepath.Base(seedPath))
-	return os.WriteFile(dest, data, 0o644)
-}
-
 func findSeedExportPath() (string, error) {
 	candidates := []string{
 		os.Getenv("SEED_EXPORT_PATH"),
@@ -87,10 +66,11 @@ func listUserExports(cfg config.Config, userID string) ([]string, error) {
 	if userID == "" {
 		return []string{guestExportName}, nil
 	}
-	if err := ensureSeedExport(cfg, userID); err != nil {
+	dir := userScopeDir(cfg, userID)
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
-	paths, err := filepath.Glob(filepath.Join(userScopeDir(cfg, userID), "*.csv"))
+	paths, err := filepath.Glob(filepath.Join(dir, "*.csv"))
 	if err != nil {
 		return nil, err
 	}
@@ -109,9 +89,6 @@ func listUserExports(cfg config.Config, userID string) ([]string, error) {
 func loadUserExport(cfg config.Config, userID, name string) ([]model.Transaction, error) {
 	if userID == "" {
 		return loadGuestExport(name)
-	}
-	if err := ensureSeedExport(cfg, userID); err != nil {
-		return nil, err
 	}
 	return loader.LoadExport(userScopeDir(cfg, userID), name)
 }

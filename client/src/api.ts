@@ -63,20 +63,6 @@ async function postJson<T>(url: string): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-async function postJsonBody<T>(url: string, body: unknown): Promise<T> {
-  const response = await fetch(url, {
-    method: 'POST',
-    credentials: 'same-origin',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) {
-    const detail = await response.json().catch(() => null) as { error?: string } | null;
-    throw new Error(detail?.error || `${url} failed with HTTP ${response.status}`);
-  }
-  return response.json() as Promise<T>;
-}
-
 export async function getAuthSession(): Promise<AuthSession> {
   const raw = await getJson<unknown>('/api/auth/session');
   return AuthSessionSchema.parse(raw) as AuthSession;
@@ -200,16 +186,6 @@ export async function loginWithPasskey(): Promise<AuthSession> {
   return AuthSessionSchema.parse(await finish.json()) as AuthSession;
 }
 
-export async function registerWithEmail(email: string, password: string, name?: string): Promise<AuthSession> {
-  const raw = await postJsonBody<unknown>('/api/auth/register', { email, password, name });
-  return AuthSessionSchema.parse(raw) as AuthSession;
-}
-
-export async function loginWithEmail(email: string, password: string): Promise<AuthSession> {
-  const raw = await postJsonBody<unknown>('/api/auth/login', { email, password });
-  return AuthSessionSchema.parse(raw) as AuthSession;
-}
-
 export async function exchangeAuth0Session(accessToken: string): Promise<AuthSession> {
   const response = await fetch('/api/auth/auth0', {
     method: 'POST',
@@ -260,10 +236,7 @@ export async function fetchPerformance(exportName: ExportName, benchmark?: strin
 
 export async function loadDashboard(exportName: ExportName, benchmark?: string): Promise<DashboardData> {
   const q = `?export=${encodeURIComponent(exportName)}`;
-  const [exports, summary] = await Promise.all([
-    listExports(),
-    getJson<unknown>(`/api/summary${q}`).then((r) => SummarySchema.parse(r) as Summary),
-  ]);
+  const summary = await getJson<unknown>(`/api/summary${q}`).then((r) => SummarySchema.parse(r) as Summary);
   const [holdingsPayload, positionReturnsPayload, perf, cashFlow, incomePayload, realizedPayload, taxPayload, analytics] =
     await Promise.all([
       getJson<unknown>(`/api/holdings${q}`).then((r) =>
@@ -285,7 +258,6 @@ export async function loadDashboard(exportName: ExportName, benchmark?: string):
     ]);
 
   return {
-    exports,
     summary,
     holdings: holdingsPayload.holdings,
     positionReturns: positionReturnsPayload.returns,

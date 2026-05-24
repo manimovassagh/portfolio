@@ -6,6 +6,8 @@ import os from 'os';
 
 test.beforeEach(async ({ page }) => {
   await mockApiRoutes(page);
+  await page.route('**/api/exports', (route) => route.fulfill({ json: { exports: ['sample-portfolio.csv', 'demo.csv'] } }));
+  await page.route('**/api/upload', (route) => route.fulfill({ json: { filename: 'demo.csv', exports: ['demo.csv', 'sample-portfolio.csv'] } }));
 });
 
 test('CSV upload via header button shows success toast', async ({ page }) => {
@@ -24,7 +26,8 @@ test('CSV upload via header button shows success toast', async ({ page }) => {
     const fileInput = page.locator('input[type="file"]');
     await fileInput.setInputFiles(tmpFile);
     // Toast should confirm upload.
-    await expect(page.getByText(/loaded|uploaded|demo\.csv/i)).toBeVisible({ timeout: 8000 });
+    await expect(page.getByText('Loaded demo.csv')).toBeVisible({ timeout: 8000 });
+    await expect(page.locator('#export-picker')).toHaveValue('demo.csv');
   }
 
   fs.unlinkSync(tmpFile);

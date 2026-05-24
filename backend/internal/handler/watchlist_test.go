@@ -36,7 +36,7 @@ func TestWatchlistRejectsMissingISIN(t *testing.T) {
 	}
 }
 
-func TestWatchlistRejectsInvalidISIN(t *testing.T) {
+func TestWatchlistAllowsTickerFavorites(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store, err := db.Open(":memory:")
 	if err != nil {
@@ -53,12 +53,20 @@ func TestWatchlistRejectsInvalidISIN(t *testing.T) {
 	r.POST("/watchlist", h.Add)
 
 	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/watchlist", strings.NewReader(`{"isin":"AAPL","name":"Apple Inc."}`))
+	req := httptest.NewRequest(http.MethodPost, "/watchlist", strings.NewReader(`{"ticker":"AAPL","name":"Apple Inc."}`))
 	req.Header.Set("Content-Type", "application/json")
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for short ISIN, got %d: %s", w.Code, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200 for ticker favorite, got %d: %s", w.Code, w.Body.String())
+	}
+
+	items, err := store.GetWatchlist("user-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(items) != 1 || items[0].ISIN != "AAPL" || items[0].Ticker != "AAPL" {
+		t.Fatalf("unexpected item: %+v", items)
 	}
 }
 

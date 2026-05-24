@@ -4,7 +4,7 @@
 
 > Self-hosted portfolio analytics for Trade Republic — live prices, allocation, performance, tax, and FIRE projections in one dark-mode dashboard.
 
-The repo ships with `exports/sample-portfolio.csv` so you can run immediately without any private data.
+The repo ships with `exports/sample-portfolio.csv` so anonymous visitors can explore the dashboard immediately without any private data. Signed-in users start with their own uploads only.
 
 ---
 
@@ -83,8 +83,8 @@ make exports    List CSV files in exports/
 
 1. In Trade Republic: **Settings → Export → Transaction history** → download CSV.
 2. Open the app and start from the bundled `sample-portfolio.csv` on the home page.
-3. When you click **Import**, the app asks you to sign in with email and password first.
-4. Each signed-in user gets their own export folder; the bundled `sample-portfolio.csv` stays available as the public sample.
+3. When you click **Import**, the app asks you to sign in with Auth0 first.
+4. Each signed-in user gets their own export folder; the bundled `sample-portfolio.csv` is only used for the public demo view.
 
 ---
 
@@ -105,7 +105,7 @@ Place your CSV exports in `exports/` before starting — they are volume-mounted
 
 ### Auth0 login
 
-Auth0 is optional in local development but required for the production login flow once you wire it up.
+Auth0 is the only login path. Configure it locally if you want to exercise sign-in against a real tenant.
 
 Frontend env vars:
 
@@ -123,9 +123,9 @@ Backend env vars:
 
 The repository root also contains a single-container Docker build for hosts that want one image for the UI, API, and pricer.
 
-- The app starts on the public sample portfolio and asks for sign-in only when you import CSVs or use persisted data
+- The app starts on the public sample portfolio for anonymous visitors and shows only user uploads after sign-in
 - CSV uploads and watchlist data are scoped per signed-in user
-- Auth0 can be enabled by setting the same Auth0 domain/audience on the frontend and backend
+- Auth0 is the production login path; set the same Auth0 domain/audience on the frontend and backend
 - Render or another proxy terminates TLS, so the container only needs to listen on its internal port
 
 Build locally with:

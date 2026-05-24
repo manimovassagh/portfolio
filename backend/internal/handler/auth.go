@@ -5,7 +5,6 @@ import (
 	"errors"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
 
@@ -46,10 +45,10 @@ func (h *AuthHandler) Session(c *gin.Context) {
 func (h *AuthHandler) Providers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"providers": gin.H{
-			"local":   true,
+			"local":   false,
 			"auth0":   h.cfg.Auth0Domain != "" && h.cfg.Auth0Audience != "",
-			"google":  os.Getenv("GOOGLE_CLIENT_ID") != "",
-			"apple":   os.Getenv("APPLE_CLIENT_ID") != "",
+			"google":  false,
+			"apple":   false,
 			"passkey": false,
 		},
 	})

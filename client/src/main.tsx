@@ -16,7 +16,7 @@ const queryClient = new QueryClient({
   },
 });
 
-function Auth0ProviderWithRouter({ children }: { children: React.ReactNode }) {
+export function Auth0ProviderWithRouter({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const location = useLocation();
 

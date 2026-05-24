@@ -75,10 +75,89 @@ func (h *MarketHandler) Quote(c *gin.Context) {
 	}
 	result, err := h.pricerGet("/quote", url.Values{"ticker": {ticker}})
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+		fallback, ferr := h.quoteFallback(ticker)
+		if ferr == nil {
+			c.JSON(http.StatusOK, fallback)
+			return
+		}
+		c.JSON(http.StatusOK, gin.H{
+			"ticker":      ticker,
+			"price":       nil,
+			"prev_close":  nil,
+			"change":      nil,
+			"change_pct":  nil,
+			"day_high":    nil,
+			"day_low":     nil,
+			"wk52_high":   nil,
+			"wk52_low":    nil,
+			"market_cap":  nil,
+			"currency":    nil,
+			"volume":      nil,
+		})
 		return
 	}
 	c.JSON(http.StatusOK, result)
+}
+
+func (h *MarketHandler) quoteFallback(ticker string) (gin.H, error) {
+	result, err := h.pricerGet("/history", url.Values{"ticker": {ticker}, "range": {"1M"}})
+	if err != nil {
+		return nil, err
+	}
+	raw, ok := result.(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected history payload")
+	}
+	seriesRaw, _ := raw["series"].([]any)
+	if len(seriesRaw) == 0 {
+		return gin.H{
+			"ticker":      ticker,
+			"price":       nil,
+			"prev_close":  nil,
+			"change":      nil,
+			"change_pct":  nil,
+			"day_high":    nil,
+			"day_low":     nil,
+			"wk52_high":   nil,
+			"wk52_low":    nil,
+			"market_cap":  nil,
+			"currency":    nil,
+			"volume":      nil,
+		}, nil
+	}
+	last, ok := seriesRaw[len(seriesRaw)-1].(map[string]any)
+	if !ok {
+		return nil, fmt.Errorf("unexpected history series entry")
+	}
+	price, _ := last["close"].(float64)
+	prev := price
+	if len(seriesRaw) > 1 {
+		if prevRow, ok := seriesRaw[len(seriesRaw)-2].(map[string]any); ok {
+			if v, ok := prevRow["close"].(float64); ok {
+				prev = v
+			}
+		}
+	}
+	var change, changePct any = nil, nil
+	if prev != 0 {
+		c := price - prev
+		change = c
+		changePct = c / prev * 100
+	}
+	return gin.H{
+		"ticker":      ticker,
+		"price":       price,
+		"prev_close":  prev,
+		"change":      change,
+		"change_pct":  changePct,
+		"day_high":    nil,
+		"day_low":     nil,
+		"wk52_high":   nil,
+		"wk52_low":    nil,
+		"market_cap":  nil,
+		"currency":    nil,
+		"volume":      nil,
+	}, nil
 }
 
 func (h *MarketHandler) History(c *gin.Context) {

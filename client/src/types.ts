@@ -199,7 +199,6 @@ export type MarketNewsItem = {
 };
 
 export type DashboardData = {
-  exports: ExportName[];
   summary: Summary;
   holdings: Holding[];
   positionReturns: PositionReturns;

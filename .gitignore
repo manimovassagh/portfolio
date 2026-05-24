@@ -18,6 +18,7 @@ certs/
 .claude/
 .DS_Store
 .gocache/
+backend/.gomodcache/
 cache/
 static/dist/
 client/dist/

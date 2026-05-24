@@ -164,7 +164,6 @@ export default function App() {
     try {
       const payload = await loadDashboard(name);
       setData(payload);
-      setExports(payload.exports);
       setExportName(name);
       localStorage.setItem('selectedExport', name);
       setLastUpdated(new Date());
@@ -205,6 +204,13 @@ export default function App() {
       .then((items) => {
         if (!mounted) return;
         setExports(items);
+        if (authSession?.authenticated && items.length === 0) {
+          setExportName('');
+          setData(null);
+          setError(null);
+          setLoading(false);
+          return;
+        }
         const saved = localStorage.getItem('selectedExport') || '';
         const chosen = items.includes(exportParam)
           ? exportParam
@@ -355,7 +361,7 @@ export default function App() {
         </Suspense>
       </ErrorBoundary>
     );
-  }, [acceptAuthSession, active, authenticated, chartMode, dark, data, exportName, livePrices, navigate, openAsset]);
+  }, [acceptAuthSession, active, authenticated, chartMode, dark, data, exportName, holderName, livePrices, navigate, openAsset]);
 
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-black dark:text-slate-100">

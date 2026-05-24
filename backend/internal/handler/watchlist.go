@@ -90,12 +90,16 @@ func (h *WatchlistHandler) Add(c *gin.Context) {
 	item.Name = strings.TrimSpace(item.Name)
 	item.Notes = strings.TrimSpace(item.Notes)
 
+	if item.ISIN == "" && item.Ticker != "" {
+		item.ISIN = item.Ticker
+	}
+
 	if item.ISIN == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "isin is required"})
 		return
 	}
-	if !isinRE.MatchString(item.ISIN) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "isin must be 12 uppercase alphanumeric characters (e.g. IE00B4L5Y983)"})
+	if !isinRE.MatchString(item.ISIN) && item.ISIN != item.Ticker {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "use a real ISIN or provide a ticker-style favorite"})
 		return
 	}
 	if item.Name == "" {

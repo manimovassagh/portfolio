@@ -3,6 +3,7 @@ package handler
 import (
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -24,10 +25,18 @@ func TestMarketQuoteRequiresTicker(t *testing.T) {
 	}
 }
 
-func TestMarketProxyRejectsPricerNonOK(t *testing.T) {
+func TestMarketQuoteFallsBackOnPricerNonOK(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	pricer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		http.Error(w, `{"detail":"down"}`, http.StatusServiceUnavailable)
+		switch r.URL.Path {
+		case "/quote":
+			http.Error(w, `{"detail":"down"}`, http.StatusServiceUnavailable)
+		case "/history":
+			w.Header().Set("Content-Type", "application/json")
+			_, _ = w.Write([]byte(`{"series":[{"date":"2024-01-01","close":120.0},{"date":"2024-01-02","close":123.0}]}`))
+		default:
+			http.NotFound(w, r)
+		}
 	}))
 	defer pricer.Close()
 
@@ -39,8 +48,11 @@ func TestMarketProxyRejectsPricerNonOK(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/quote?ticker=AAPL", nil)
 	r.ServeHTTP(w, req)
 
-	if w.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d", w.Code)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if got := w.Body.String(); !strings.Contains(got, `"ticker":"AAPL"`) || !strings.Contains(got, `"price":123`) {
+		t.Fatalf("unexpected fallback body: %s", got)
 	}
 }
 
