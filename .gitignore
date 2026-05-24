@@ -17,6 +17,7 @@ screenshots/
 certs/
 .claude/
 .DS_Store
+.gocache/
 cache/
 static/dist/
 client/dist/

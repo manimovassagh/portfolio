@@ -54,6 +54,7 @@ func main() {
 	api.GET("/auth/providers", authH.Providers)
 	api.POST("/auth/register", authH.Register)
 	api.POST("/auth/login", authH.Login)
+	api.POST("/auth/auth0", authH.Auth0)
 	api.POST("/auth/google", authH.Google)
 	api.POST("/auth/apple", authH.Apple)
 	api.POST("/auth/dev", authH.DevLogin)

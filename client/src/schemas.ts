@@ -306,6 +306,7 @@ export const AuthSessionSchema = z.object({
 export const AuthProvidersSchema = z.object({
   providers: z.object({
     local: z.boolean(),
+    auth0: z.boolean(),
     google: z.boolean(),
     apple: z.boolean(),
     passkey: z.boolean(),

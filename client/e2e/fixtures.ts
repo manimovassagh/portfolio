@@ -118,7 +118,7 @@ const WATCHLIST = {
 // run without a live backend.
 export async function mockApiRoutes(page: Page): Promise<void> {
   await page.route('**/api/auth/session', (r) => r.fulfill({ json: SESSION }));
-  await page.route('**/api/auth/providers', (r) => r.fulfill({ json: { google: false, apple: false, passkey: false, dev: true } }));
+  await page.route('**/api/auth/providers', (r) => r.fulfill({ json: { providers: { local: true, auth0: false, google: false, apple: false, passkey: false, dev: true } } }));
   await page.route('**/api/exports', (r) => r.fulfill({ json: EXPORTS }));
   await page.route('**/api/summary**', (r) => r.fulfill({ json: SUMMARY }));
   await page.route('**/api/portfolio**', (r) => r.fulfill({ json: SUMMARY }));

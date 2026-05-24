@@ -210,6 +210,21 @@ export async function loginWithEmail(email: string, password: string): Promise<A
   return AuthSessionSchema.parse(raw) as AuthSession;
 }
 
+export async function exchangeAuth0Session(accessToken: string): Promise<AuthSession> {
+  const response = await fetch('/api/auth/auth0', {
+    method: 'POST',
+    credentials: 'same-origin',
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+    },
+  });
+  if (!response.ok) {
+    const detail = await response.json().catch(() => null) as { error?: string } | null;
+    throw new Error(detail?.error || `Auth0 login failed with HTTP ${response.status}`);
+  }
+  return AuthSessionSchema.parse(await response.json()) as AuthSession;
+}
+
 export async function loginInDevMode(username?: string): Promise<AuthSession> {
   const url = username ? `/api/auth/dev?username=${encodeURIComponent(username)}` : '/api/auth/dev';
   const response = await fetch(url, {

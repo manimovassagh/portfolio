@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/auth"
+	auth0pkg "github.com/manimovassagh/portfolio/internal/auth0"
 	"github.com/manimovassagh/portfolio/internal/config"
 	"github.com/manimovassagh/portfolio/internal/model"
 	"golang.org/x/crypto/bcrypt"
@@ -46,11 +47,53 @@ func (h *AuthHandler) Providers(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"providers": gin.H{
 			"local":   true,
+			"auth0":   h.cfg.Auth0Domain != "" && h.cfg.Auth0Audience != "",
 			"google":  os.Getenv("GOOGLE_CLIENT_ID") != "",
 			"apple":   os.Getenv("APPLE_CLIENT_ID") != "",
 			"passkey": false,
 		},
 	})
+}
+
+func (h *AuthHandler) Auth0(c *gin.Context) {
+	if h.cfg.Auth0Domain == "" || h.cfg.Auth0Audience == "" {
+		c.JSON(http.StatusNotImplemented, gin.H{"error": "Auth0 is not configured yet"})
+		return
+	}
+
+	token := strings.TrimSpace(strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer "))
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "missing bearer token"})
+		return
+	}
+
+	profile, err := auth0pkg.Verify(c.Request.Context(), h.cfg.Auth0Domain, h.cfg.Auth0Audience, token)
+	if err != nil {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "auth0 token verification failed"})
+		return
+	}
+
+	email := strings.TrimSpace(profile.Email)
+	if email == "" {
+		email = profile.Subject + "@auth0.local"
+	}
+	name := strings.TrimSpace(profile.Name)
+	if name == "" {
+		name = strings.TrimSpace(profile.Nickname)
+	}
+	if name == "" {
+		name = strings.TrimSpace(strings.Split(email, "@")[0])
+	}
+	if name == "" {
+		name = "Auth0 User"
+	}
+
+	user, err := h.store.CreateUser("auth0", profile.Subject, email, name)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not create auth0 account"})
+		return
+	}
+	h.issueSession(c, user)
 }
 
 func (h *AuthHandler) Google(c *gin.Context) {

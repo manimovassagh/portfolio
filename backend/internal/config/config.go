@@ -13,6 +13,8 @@ type Config struct {
 	CookieSecure  bool
 	PasskeyRPID   string
 	PasskeyOrigin string
+	Auth0Domain   string
+	Auth0Audience string
 }
 
 func Load() Config {
@@ -27,6 +29,8 @@ func Load() Config {
 		CookieSecure:  getBoolEnv("AUTH_COOKIE_SECURE", false),
 		PasskeyRPID:   getEnv("PASSKEY_RPID", "localhost"),
 		PasskeyOrigin: getEnv("PASSKEY_ORIGIN", "http://localhost:5173"),
+		Auth0Domain:   getEnv("AUTH0_DOMAIN", ""),
+		Auth0Audience: getEnv("AUTH0_AUDIENCE", ""),
 	}
 }
 

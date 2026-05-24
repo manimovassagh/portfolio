@@ -75,6 +75,8 @@ make cache      Clear the yfinance price cache
 make exports    List CSV files in exports/
 ```
 
+`make clean` removes generated build outputs and caches (`client/dist/`, `static/dist/`, `.gocache/`, logs, and Python bytecode) without touching source files.
+
 ---
 
 ## Import your data
@@ -101,12 +103,29 @@ After `make docker`:
 
 Place your CSV exports in `exports/` before starting — they are volume-mounted.
 
+### Auth0 login
+
+Auth0 is optional in local development but required for the production login flow once you wire it up.
+
+Frontend env vars:
+
+- `VITE_AUTH0_DOMAIN`
+- `VITE_AUTH0_CLIENT_ID`
+- `VITE_AUTH0_AUDIENCE`
+- `VITE_AUTH0_REDIRECT_URI` (defaults to the current origin)
+
+Backend env vars:
+
+- `AUTH0_DOMAIN`
+- `AUTH0_AUDIENCE`
+
 ### Single-container deploy
 
 The repository root also contains a single-container Docker build for hosts that want one image for the UI, API, and pricer.
 
 - The app starts on the public sample portfolio and asks for sign-in only when you import CSVs or use persisted data
 - CSV uploads and watchlist data are scoped per signed-in user
+- Auth0 can be enabled by setting the same Auth0 domain/audience on the frontend and backend
 - Render or another proxy terminates TLS, so the container only needs to listen on its internal port
 
 Build locally with:

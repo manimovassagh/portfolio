@@ -7,9 +7,11 @@ import { useLivePrices } from './lib/useLivePrices';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
 import { AuthScreen } from './components/AuthScreen';
+import { Auth0SessionBridge } from './components/Auth0SessionBridge';
 import { SkeletonDashboard, EmptyState } from './components/ui/Skeleton';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import type { AssetDetail, AuthSession, ChartMode, DashboardData, ExportName, Holding, SectionId } from './types';
+import { auth0Config } from './lib/auth0';
 
 const Overview = lazy(() => import('./components/views/Overview').then((m) => ({ default: m.Overview })));
 const AnalyticsView = lazy(() => import('./components/views/Analytics').then((m) => ({ default: m.AnalyticsView })));
@@ -270,6 +272,12 @@ export default function App() {
 
   const handleLogout = async () => {
     await logout().catch(() => {});
+    if (authSession?.user?.provider === 'auth0' && auth0Config.enabled) {
+      const returnTo = encodeURIComponent(window.location.origin);
+      const logoutUrl = `https://${auth0Config.domain}/v2/logout?client_id=${encodeURIComponent(auth0Config.clientId)}&returnTo=${returnTo}`;
+      window.location.assign(logoutUrl);
+      return;
+    }
     setAuthSession({ authenticated: false, required: false, user: null });
     setData(null);
     setExports([]);
@@ -339,7 +347,7 @@ export default function App() {
           {active === 'watchlist' && (
             authenticated
               ? <WatchlistView exportName={exportName} />
-              : <AuthScreen embedded accountHolderName={holderName} onAuthenticated={acceptAuthSession} />
+              : <AuthScreen embedded auth0Enabled={auth0Config.enabled} accountHolderName={holderName} onAuthenticated={acceptAuthSession} />
           )}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
@@ -352,6 +360,10 @@ export default function App() {
   return (
     <div className="min-h-screen bg-slate-100 text-slate-950 dark:bg-black dark:text-slate-100">
       <div className="fixed inset-0 -z-10 bg-[radial-gradient(ellipse_at_top_left,rgba(69,196,176,0.12),transparent_34%),linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:auto,56px_56px,56px_56px]" />
+
+      {auth0Config.enabled && (
+        <Auth0SessionBridge currentSession={authSession} onAuthenticated={acceptAuthSession} />
+      )}
 
       <main className="min-h-screen min-w-0">
         <header className="sticky top-0 z-30 border-b border-black/10 bg-white/90 backdrop-blur-xl dark:border-[#2b2b2b] dark:bg-[#242424]/95">
@@ -600,7 +612,7 @@ export default function App() {
           }}
         >
           <div onMouseDown={(event) => event.stopPropagation()}>
-            <AuthScreen embedded accountHolderName={holderName} onAuthenticated={acceptAuthSession} />
+            <AuthScreen embedded auth0Enabled={auth0Config.enabled} accountHolderName={holderName} onAuthenticated={acceptAuthSession} />
           </div>
         </div>
       )}

@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Loader2, LockKeyhole, ShieldCheck, UserPlus } from 'lucide-react';
 import { loginWithEmail, registerWithEmail } from '../api';
 import type { AuthSession } from '../types';
+import { Auth0LoginButton } from './Auth0LoginButton';
 
 type Mode = 'login' | 'register';
 
@@ -9,10 +10,12 @@ export function AuthScreen({
   onAuthenticated,
   embedded = false,
   accountHolderName,
+  auth0Enabled = false,
 }: {
   onAuthenticated: (session: AuthSession) => void;
   embedded?: boolean;
   accountHolderName?: string | null;
+  auth0Enabled?: boolean;
 }) {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -46,7 +49,9 @@ export function AuthScreen({
         </div>
         <div>
           <h1 className="text-xl font-black tracking-tight">Sign in to Kapital</h1>
-          <p className="mt-1 text-sm font-semibold text-slate-500">Use an email and password.</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">
+            {auth0Enabled ? 'Continue with Auth0 or use an email and password.' : 'Use an email and password.'}
+          </p>
           {accountHolderName && (
             <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
               Account holder: {accountHolderName}
@@ -73,6 +78,12 @@ export function AuthScreen({
           Create account
         </button>
       </div>
+
+      {auth0Enabled && (
+        <div className="mb-4">
+          <Auth0LoginButton />
+        </div>
+      )}
 
       {mode === 'register' && (
         <div className="mb-3">

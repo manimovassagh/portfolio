@@ -114,6 +114,7 @@ install:
 clean:
 	@find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null; \
 	find . -name "*.pyc" -delete 2>/dev/null; \
+	rm -rf .gocache/ client/dist/ static/dist/ client/playwright-report/ client/test-results/ logs/ 2>/dev/null; \
 	echo "Cleaned."
 
 cache:
