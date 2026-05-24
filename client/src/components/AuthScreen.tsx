@@ -8,9 +8,11 @@ type Mode = 'login' | 'register';
 export function AuthScreen({
   onAuthenticated,
   embedded = false,
+  accountHolderName,
 }: {
   onAuthenticated: (session: AuthSession) => void;
   embedded?: boolean;
+  accountHolderName?: string | null;
 }) {
   const [mode, setMode] = useState<Mode>('login');
   const [email, setEmail] = useState('');
@@ -45,6 +47,11 @@ export function AuthScreen({
         <div>
           <h1 className="text-xl font-black tracking-tight">Sign in to Kapital</h1>
           <p className="mt-1 text-sm font-semibold text-slate-500">Use an email and password.</p>
+          {accountHolderName && (
+            <p className="mt-1 text-xs font-bold uppercase tracking-wide text-slate-400">
+              Account holder: {accountHolderName}
+            </p>
+          )}
         </div>
       </div>
 

@@ -339,7 +339,7 @@ export default function App() {
           {active === 'watchlist' && (
             authenticated
               ? <WatchlistView exportName={exportName} />
-              : <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+              : <AuthScreen embedded accountHolderName={holderName} onAuthenticated={acceptAuthSession} />
           )}
           {active === 'rebalance' && <RebalanceView data={data} />}
           {active === 'goals'     && <GoalsView data={data} />}
@@ -600,7 +600,7 @@ export default function App() {
           }}
         >
           <div onMouseDown={(event) => event.stopPropagation()}>
-            <AuthScreen embedded onAuthenticated={acceptAuthSession} />
+            <AuthScreen embedded accountHolderName={holderName} onAuthenticated={acceptAuthSession} />
           </div>
         </div>
       )}
