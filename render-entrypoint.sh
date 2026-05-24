@@ -30,6 +30,14 @@ for _ in $(seq 1 60); do
 done
 
 envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
+cat > /usr/share/nginx/html/runtime-config.js <<EOF
+window.__KAPITAL_RUNTIME__ = {
+  auth0Domain: "${VITE_AUTH0_DOMAIN:-}",
+  auth0ClientId: "${VITE_AUTH0_CLIENT_ID:-}",
+  auth0Audience: "${VITE_AUTH0_AUDIENCE:-}",
+  auth0RedirectUri: "${VITE_AUTH0_REDIRECT_URI:-}",
+};
+EOF
 nginx -g 'daemon off;' &
 nginx_pid=$!
 

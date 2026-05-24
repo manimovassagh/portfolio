@@ -1,10 +1,16 @@
 const trim = (value?: string | null) => value?.trim() || '';
 
+const runtime = window.__KAPITAL_RUNTIME__ || {};
+const domain = trim(runtime.auth0Domain) || trim(import.meta.env.VITE_AUTH0_DOMAIN);
+const clientId = trim(runtime.auth0ClientId) || trim(import.meta.env.VITE_AUTH0_CLIENT_ID);
+const audience = trim(runtime.auth0Audience) || trim(import.meta.env.VITE_AUTH0_AUDIENCE);
+const redirectUri = trim(runtime.auth0RedirectUri) || trim(import.meta.env.VITE_AUTH0_REDIRECT_URI) || window.location.origin;
+
 export const auth0Config = {
-  domain: trim(import.meta.env.VITE_AUTH0_DOMAIN),
-  clientId: trim(import.meta.env.VITE_AUTH0_CLIENT_ID),
-  audience: trim(import.meta.env.VITE_AUTH0_AUDIENCE),
-  redirectUri: trim(import.meta.env.VITE_AUTH0_REDIRECT_URI) || window.location.origin,
-  enabled: Boolean(trim(import.meta.env.VITE_AUTH0_DOMAIN) && trim(import.meta.env.VITE_AUTH0_CLIENT_ID) && trim(import.meta.env.VITE_AUTH0_AUDIENCE)),
+  domain,
+  clientId,
+  audience,
+  redirectUri,
+  enabled: Boolean(domain && clientId && audience),
 };
 export const auth0Scopes = 'openid profile email';
