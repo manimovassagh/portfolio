@@ -365,3 +365,7 @@ export async function uploadExport(file: File): Promise<{ filename: string; expo
   if (!response.ok) throw new Error(`Upload failed with HTTP ${response.status}`);
   return response.json() as Promise<{ filename: string; exports: ExportName[]; export_infos?: ExportInfo[] }>;
 }
+
+export async function loadSampleExport(): Promise<{ filename: string; exports: ExportName[]; export_infos?: ExportInfo[] }> {
+  return postJson<{ filename: string; exports: ExportName[]; export_infos?: ExportInfo[] }>('/api/sample_export');
+}

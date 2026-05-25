@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Briefcase, ChevronDown, Globe, History, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
+import { Activity, Briefcase, ChevronDown, Database, Globe, History, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getAuthSession, listExportCatalog, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
+import { getAuthSession, listExportCatalog, loadAsset, loadDashboard, loadSampleExport, logout, refreshPrices, uploadExport } from './api';
 import { useLivePrices } from './lib/useLivePrices';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
@@ -302,6 +302,37 @@ export default function App() {
       await loadByName(payload.filename);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
+    } finally {
+      setLoading(false);
+      setUploadStage('idle');
+    }
+  };
+
+  const handleLoadSampleData = async () => {
+    if (!authenticated) {
+      if (auth0Config.enabled) {
+        void beginAuth0Login(`${window.location.pathname}${window.location.search}`);
+        return;
+      }
+      setAuthPromptOpen(true);
+      return;
+    }
+    setUploadStage('processing');
+    setLoading(true);
+    setError(null);
+    try {
+      const payload = await loadSampleExport();
+      setExports(payload.exports);
+      if (payload.export_infos) setExportInfos(payload.export_infos);
+      setExportName(payload.filename);
+      localStorage.setItem('selectedExport', payload.filename);
+      clearExportParam();
+      setToast('Loaded sample portfolio');
+      window.setTimeout(() => setToast(null), 2800);
+      setUploadStage('refreshing');
+      await loadByName(payload.filename);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Sample data load failed');
     } finally {
       setLoading(false);
       setUploadStage('idle');
@@ -620,6 +651,8 @@ export default function App() {
 
           <input
             ref={importInputRef}
+            id="csv-import-input"
+            name="csv-import"
             type="file"
             accept=".csv"
             className="hidden"
@@ -711,7 +744,39 @@ export default function App() {
             )}
             {data && loading && <div className="rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm font-bold text-emerald-600 dark:text-emerald-400">Refreshing dashboard data...</div>}
             {!data && loading && <SkeletonDashboard />}
-            {!loading && !data && !error && <EmptyState />}
+            {!loading && !data && !error && authenticated ? (
+              <div className="rounded-xl border border-slate-200 bg-white p-8 shadow-sm dark:border-[#303030] dark:bg-[#202020]">
+                <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#45b9a8]/15 text-[#45b9a8]">
+                      <Database size={22} />
+                    </div>
+                    <h2 className="mt-4 text-xl font-black text-slate-950 dark:text-white">Start with portfolio data</h2>
+                    <p className="mt-2 max-w-xl text-sm font-semibold text-slate-500">
+                      Import your Trade Republic CSV, or load the bundled Max Musterman sample to explore the dashboard first.
+                    </p>
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row md:shrink-0">
+                    <button
+                      onClick={openImport}
+                      className="inline-flex items-center justify-center gap-2 rounded-md bg-[#45b9a8] px-4 py-3 text-sm font-black text-black hover:bg-[#5ed0c0]"
+                    >
+                      <Upload size={17} />
+                      Import CSV
+                    </button>
+                    <button
+                      onClick={handleLoadSampleData}
+                      className="inline-flex items-center justify-center gap-2 rounded-md border border-slate-300 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-slate-200 dark:hover:bg-white/10"
+                    >
+                      <Database size={17} />
+                      Load sample data
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              !loading && !data && !error && <EmptyState />
+            )}
             {routeContent}
           </div>
         </main>

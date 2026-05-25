@@ -1,10 +1,14 @@
 package handler
 
 import (
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/manimovassagh/portfolio/internal/config"
 	"github.com/manimovassagh/portfolio/internal/model"
 )
@@ -68,5 +72,45 @@ func TestBuildExportInfoUsesHolderAndDateForLabel(t *testing.T) {
 	}
 	if info["transaction_count"] != 2 {
 		t.Fatalf("unexpected transaction count: %v", info["transaction_count"])
+	}
+}
+
+func TestLoadSampleExportCopiesSeedIntoUserScope(t *testing.T) {
+	dir := t.TempDir()
+	seed := filepath.Join(dir, "seed.csv")
+	t.Setenv("SEED_EXPORT_PATH", seed)
+	if err := os.WriteFile(seed, []byte("Date,Type,Description\n2026-01-01,TRANSFER_INBOUND,Cash transfer from Max Musterman\n"), 0o644); err != nil {
+		t.Fatalf("write seed: %v", err)
+	}
+
+	gin.SetMode(gin.TestMode)
+	cfg := config.Config{ExportsDir: dir}
+	h := NewMiscHandler(cfg, nil)
+	r := gin.New()
+	r.Use(func(c *gin.Context) {
+		c.Set("user_id", "auth0|user-123")
+		c.Next()
+	})
+	r.POST("/sample_export", h.LoadSampleExport)
+
+	w := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/sample_export", nil)
+	r.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", w.Code, w.Body.String())
+	}
+	if _, err := os.Stat(filepath.Join(userScopeDir(cfg, "auth0|user-123"), guestExportName)); err != nil {
+		t.Fatalf("sample was not copied: %v", err)
+	}
+	var payload struct {
+		Filename string   `json:"filename"`
+		Exports  []string `json:"exports"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if payload.Filename != guestExportName || len(payload.Exports) != 1 || payload.Exports[0] != guestExportName {
+		t.Fatalf("unexpected response: %+v", payload)
 	}
 }

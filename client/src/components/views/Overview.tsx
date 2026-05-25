@@ -374,6 +374,9 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-black text-slate-500">Benchmark:</span>
                     <select
+                      id="benchmark-picker"
+                      name="benchmark"
+                      aria-label="Benchmark"
                       value={benchmarkTicker}
                       onChange={(e) => setBenchmarkTicker(e.target.value)}
                       className="rounded-md bg-white/10 px-2 py-1 text-xs font-black text-slate-200 outline-none hover:bg-white/15"

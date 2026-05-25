@@ -303,3 +303,39 @@ func (h *MiscHandler) Upload(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"filename": name, "exports": names, "export_infos": listUserExportInfos(h.cfg, userID, names)})
 }
+
+func (h *MiscHandler) LoadSampleExport(c *gin.Context) {
+	userID := currentUserID(c)
+	if userID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "sign in required"})
+		return
+	}
+	seedPath, err := findSeedExportPath()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	source, err := os.Open(seedPath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot open sample export"})
+		return
+	}
+	defer func() { _ = source.Close() }()
+
+	userDir := userScopeDir(h.cfg, userID)
+	if err := os.MkdirAll(userDir, 0o755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot create exports dir"})
+		return
+	}
+	name := guestExportName
+	if err := copyFile(filepath.Join(userDir, name), source); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "cannot copy sample export"})
+		return
+	}
+	names, err := listUserExports(h.cfg, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"filename": name, "exports": names, "export_infos": listUserExportInfos(h.cfg, userID, names)})
+}

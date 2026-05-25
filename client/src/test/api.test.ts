@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listExportCatalog, listExports, marketQuote, getAuthSession } from '../api';
+import { getAuthSession, listExportCatalog, listExports, loadSampleExport, marketQuote } from '../api';
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -46,6 +46,35 @@ describe('listExports', () => {
     }));
 
     await expect(listExports()).rejects.toThrow('401');
+  });
+});
+
+describe('loadSampleExport', () => {
+  it('loads the signed-in user sample export', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        filename: 'sample-portfolio.csv',
+        exports: ['sample-portfolio.csv'],
+        export_infos: [{
+          name: 'sample-portfolio.csv',
+          label: 'Max Musterman · Trade Republic · 2026-05',
+          holder_name: 'Max Musterman',
+          broker: 'Trade Republic',
+          imported_at: '2026-05-25T00:00:00Z',
+          first_date: '2026-01-01',
+          last_date: '2026-05-01',
+          transaction_count: 12,
+        }],
+      }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await loadSampleExport();
+
+    expect(fetchMock).toHaveBeenCalledWith('/api/sample_export', { method: 'POST', credentials: 'same-origin' });
+    expect(result.filename).toBe('sample-portfolio.csv');
+    expect(result.export_infos?.[0]?.holder_name).toBe('Max Musterman');
   });
 });
 

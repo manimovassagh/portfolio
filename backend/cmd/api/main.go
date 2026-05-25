@@ -110,6 +110,7 @@ func main() {
 	// Actions
 	publicData.POST("/refresh_prices", miscH.RefreshPrices)
 	protected.POST("/upload", miscH.Upload)
+	protected.POST("/sample_export", miscH.LoadSampleExport)
 
 	// Docs (outside /api group — no auth required)
 	r.GET("/docs", coreH.DocsUI)
