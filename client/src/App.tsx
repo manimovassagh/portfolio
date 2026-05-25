@@ -122,13 +122,6 @@ export default function App() {
 
   const livePrices = useLivePrices(exportName || null);
   const activeExportInfo = exportInfos.find((item) => item.name === exportName) ?? null;
-  const compactExportLabel = useCallback((name: string) => {
-    const info = exportInfos.find((item) => item.name === name);
-    if (!info) return name;
-    const month = info.last_date?.slice(0, 7);
-    return [info.broker, month].filter(Boolean).join(' · ') || info.name;
-  }, [exportInfos]);
-
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('theme', dark ? 'dark' : 'light');
@@ -531,7 +524,7 @@ export default function App() {
                     disabled={loading}
                   >
                     <option value="all">All (merged)</option>
-                    {exports.map((item) => <option key={item} value={item}>{compactExportLabel(item)}</option>)}
+                    {exports.map((item) => <option key={item} value={item}>{item}</option>)}
                   </select>
                 )}
                 {authenticated && exports.length > 0 && (
