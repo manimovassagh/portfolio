@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { listExports, marketQuote, getAuthSession } from '../api';
+import { listExportCatalog, listExports, marketQuote, getAuthSession } from '../api';
 
 beforeEach(() => {
   vi.restoreAllMocks();
@@ -14,6 +14,29 @@ describe('listExports', () => {
 
     const result = await listExports();
     expect(result).toEqual(['trading-212.csv', 'ibkr.csv']);
+  });
+
+  it('returns export metadata when present', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        exports: ['trade-republic.csv'],
+        export_infos: [{
+          name: 'trade-republic.csv',
+          label: 'Max Musterman · Trade Republic · 2026-04',
+          holder_name: 'Max Musterman',
+          broker: 'Trade Republic',
+          imported_at: '2026-05-25T00:00:00Z',
+          first_date: '2025-01-01',
+          last_date: '2026-04-12',
+          transaction_count: 42,
+        }],
+      }),
+    }));
+
+    const result = await listExportCatalog();
+    expect(result.export_infos[0].label).toBe('Max Musterman · Trade Republic · 2026-04');
+    expect(result.export_infos[0].transaction_count).toBe(42);
   });
 
   it('throws when the server returns a non-ok status', async () => {

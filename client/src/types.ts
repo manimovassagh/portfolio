@@ -1,5 +1,16 @@
 export type ExportName = string;
 
+export type ExportInfo = {
+  name: string;
+  label: string;
+  holder_name: string | null;
+  broker: string | null;
+  imported_at: string | null;
+  first_date: string | null;
+  last_date: string | null;
+  transaction_count: number;
+};
+
 export type SectionId = 'overview' | 'analytics' | 'holdings' | 'cash' | 'income' | 'realized' | 'tax' | 'watchlist' | 'rebalance' | 'goals' | 'markets';
 export type ChartMode = 'Value' | 'TWR' | 'Drawdown';
 

@@ -6,6 +6,7 @@ import type {
   CashFlow,
   DashboardData,
   DividendCalendarData,
+  ExportInfo,
   ExportName,
   FsaData,
   GeographicData,
@@ -222,9 +223,25 @@ export async function logout(): Promise<void> {
 }
 
 export async function listExports(): Promise<ExportName[]> {
+  return (await listExportCatalog()).exports;
+}
+
+export async function listExportCatalog(): Promise<{ exports: ExportName[]; export_infos: ExportInfo[] }> {
   const raw = await getJson<unknown>('/api/exports');
   const payload = ExportsPayloadSchema.parse(raw);
-  return payload.exports;
+  return {
+    exports: payload.exports,
+    export_infos: payload.export_infos ?? payload.exports.map((name) => ({
+      name,
+      label: name,
+      holder_name: null,
+      broker: null,
+      imported_at: null,
+      first_date: null,
+      last_date: null,
+      transaction_count: 0,
+    })),
+  };
 }
 
 export async function fetchPerformance(exportName: ExportName, benchmark?: string): Promise<Performance> {
@@ -341,10 +358,10 @@ export async function fetchDividendCalendar(exportName: ExportName): Promise<Div
   return DividendCalendarDataSchema.parse(raw) as DividendCalendarData;
 }
 
-export async function uploadExport(file: File): Promise<{ filename: string; exports: ExportName[] }> {
+export async function uploadExport(file: File): Promise<{ filename: string; exports: ExportName[]; export_infos?: ExportInfo[] }> {
   const body = new FormData();
   body.append('file', file);
   const response = await fetch('/api/upload', { method: 'POST', body, credentials: 'same-origin' });
   if (!response.ok) throw new Error(`Upload failed with HTTP ${response.status}`);
-  return response.json() as Promise<{ filename: string; exports: ExportName[] }>;
+  return response.json() as Promise<{ filename: string; exports: ExportName[]; export_infos?: ExportInfo[] }>;
 }

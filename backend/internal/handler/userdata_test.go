@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/manimovassagh/portfolio/internal/config"
+	"github.com/manimovassagh/portfolio/internal/model"
 )
 
 func TestListUserExportsDoesNotSeedSampleForSignedInUsers(t *testing.T) {
@@ -47,5 +48,25 @@ func TestListUserExportsStillExposesGuestSample(t *testing.T) {
 	}
 	if len(names) != 1 || names[0] != guestExportName {
 		t.Fatalf("expected guest sample export, got %v", names)
+	}
+}
+
+func TestBuildExportInfoUsesHolderAndDateForLabel(t *testing.T) {
+	cfg := config.Config{ExportsDir: t.TempDir()}
+	txs := []model.Transaction{
+		{Date: "2026-03-10", Type: "TRANSFER_INBOUND", Description: "Cash transfer from Max Musterman"},
+		{Date: "2026-04-12", Category: "TRADING", Type: "BUY", Name: "Apple", ISIN: "US0378331005"},
+	}
+
+	info := buildExportInfo(cfg, "user-123", "Transaction export 7.csv", txs)
+
+	if info["label"] != "Max Musterman · Trade Republic · 2026-04" {
+		t.Fatalf("unexpected label: %v", info["label"])
+	}
+	if info["holder_name"] == nil || *(info["holder_name"].(*string)) != "Max Musterman" {
+		t.Fatalf("unexpected holder: %v", info["holder_name"])
+	}
+	if info["transaction_count"] != 2 {
+		t.Fatalf("unexpected transaction count: %v", info["transaction_count"])
 	}
 }

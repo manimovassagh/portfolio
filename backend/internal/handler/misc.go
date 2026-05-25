@@ -301,5 +301,5 @@ func (h *MiscHandler) Upload(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
-	c.JSON(http.StatusOK, gin.H{"filename": name, "exports": names})
+	c.JSON(http.StatusOK, gin.H{"filename": name, "exports": names, "export_infos": listUserExportInfos(h.cfg, userID, names)})
 }

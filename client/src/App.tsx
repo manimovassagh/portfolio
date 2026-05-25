@@ -1,9 +1,9 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Activity, Briefcase, ChevronDown, Globe, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
+import { Activity, Briefcase, ChevronDown, Globe, History, LayoutDashboard, LogOut, Menu, Moon, RefreshCw, Sun, Target, Upload, User, Wallet, Wifi, X } from 'lucide-react';
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth0 } from '@auth0/auth0-react';
-import { getAuthSession, listExports, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
+import { getAuthSession, listExportCatalog, loadAsset, loadDashboard, logout, refreshPrices, uploadExport } from './api';
 import { useLivePrices } from './lib/useLivePrices';
 import { sections } from './lib/sections';
 import { AssetModal } from './components/AssetModal';
@@ -11,7 +11,7 @@ import { AuthScreen } from './components/AuthScreen';
 import { Auth0SessionBridge } from './components/Auth0SessionBridge';
 import { SkeletonDashboard, EmptyState } from './components/ui/Skeleton';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
-import type { AssetDetail, AuthSession, ChartMode, DashboardData, ExportName, Holding, SectionId } from './types';
+import type { AssetDetail, AuthSession, ChartMode, DashboardData, ExportInfo, ExportName, Holding, SectionId } from './types';
 import { auth0Config, auth0Scopes } from './lib/auth0';
 
 const Overview = lazy(() => import('./components/views/Overview').then((m) => ({ default: m.Overview })));
@@ -100,6 +100,7 @@ export default function App() {
     return value ? `?${value}` : '';
   }, [searchParams]);
   const [exports, setExports]       = useState<ExportName[]>([]);
+  const [exportInfos, setExportInfos] = useState<ExportInfo[]>([]);
   const [exportName, setExportName] = useState<ExportName>('');
   const [data, setData]             = useState<DashboardData | null>(null);
   const [loading, setLoading]       = useState(true);
@@ -114,11 +115,16 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [authPromptOpen, setAuthPromptOpen] = useState(false);
   const [importRequested, setImportRequested] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const importInputRef               = useRef<HTMLInputElement>(null);
   const visibleSections             = sections;
   const authenticated               = !!authSession?.authenticated;
 
   const livePrices = useLivePrices(exportName || null);
+  const activeExportInfo = exportInfos.find((item) => item.name === exportName) ?? null;
+  const exportLabel = useCallback((name: string) => {
+    return exportInfos.find((item) => item.name === name)?.label || name;
+  }, [exportInfos]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -223,10 +229,12 @@ export default function App() {
     let mounted = true;
     // eslint-disable-next-line react-hooks/set-state-in-effect
     setLoading(true);
-    listExports()
-      .then((items) => {
+    listExportCatalog()
+      .then((catalog) => {
         if (!mounted) return;
+        const items = catalog.exports;
         setExports(items);
+        setExportInfos(catalog.export_infos);
         if (authSession?.authenticated && items.length === 0) {
           setExportName('');
           setData(null);
@@ -288,6 +296,7 @@ export default function App() {
       const payload = await uploadExport(file);
       setUploadStage('processing');
       setExports(payload.exports);
+      if (payload.export_infos) setExportInfos(payload.export_infos);
       setExportName(payload.filename);
       localStorage.setItem('selectedExport', payload.filename);
       clearExportParam();
@@ -371,9 +380,13 @@ export default function App() {
   useEffect(() => { setMobileMenuOpen(false); }, [active]);
 
   const holderName   = data?.summary.holder_name;
+  const activeBroker = activeExportInfo?.broker || 'Trade Republic';
   const accountName  = authSession?.user?.name || holderName;
   const initials     = accountName?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
+  const pageTitle = active === 'overview' && holderName
+    ? `Overview of ${holderName}'s ${activeBroker} account`
+    : currentLabel;
   const market = marketStatus(lastUpdated || new Date());
   const routeContent = useMemo(() => {
     if (!data) return null;
@@ -517,8 +530,17 @@ export default function App() {
                     disabled={loading}
                   >
                     <option value="all">All (merged)</option>
-                    {exports.map((item) => <option key={item} value={item}>{item}</option>)}
+                    {exports.map((item) => <option key={item} value={item}>{exportLabel(item)}</option>)}
                   </select>
+                )}
+                {authenticated && exports.length > 0 && (
+                  <button
+                    onClick={() => setHistoryOpen(true)}
+                    className="hidden h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 shadow-sm hover:bg-slate-50 lg:inline-flex dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-200 dark:hover:bg-[#383838]"
+                    title="Import history"
+                  >
+                    <History size={16} /> Imports
+                  </button>
                 )}
                 <button
                   onClick={openImport}
@@ -618,7 +640,7 @@ export default function App() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-slate-500 dark:text-slate-500">Net worth / Investments / Trade Republic</div>
-                <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{currentLabel}</h1>
+                <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{pageTitle}</h1>
               </div>
               <div className="flex flex-col items-end gap-2 text-right text-sm text-slate-500">
                 <span className={`rounded-md border px-2.5 py-1 text-xs font-black uppercase tracking-wide ${
@@ -696,6 +718,64 @@ export default function App() {
         </main>
 
       {modal && <AssetModal asset={modal} onClose={closeAsset} />}
+      {historyOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm"
+          onMouseDown={() => setHistoryOpen(false)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-2xl border border-white/10 bg-[#202020] p-6 text-white shadow-2xl"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="text-lg font-black">Import history</h2>
+                <p className="mt-1 text-sm font-semibold text-slate-500">Uploaded accounts and CSV snapshots for this signed-in user.</p>
+              </div>
+              <button onClick={() => setHistoryOpen(false)} className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-white" aria-label="Close import history">
+                <X size={18} />
+              </button>
+            </div>
+            <div className="mt-5 max-h-[60vh] space-y-3 overflow-y-auto pr-1">
+              {exportInfos.length === 0 && (
+                <div className="rounded-lg border border-white/10 bg-white/[0.04] p-5 text-sm font-semibold text-slate-400">
+                  No imports yet.
+                </div>
+              )}
+              {exportInfos.map((item) => (
+                <button
+                  key={item.name}
+                  onClick={() => {
+                    setHistoryOpen(false);
+                    void refresh(item.name);
+                  }}
+                  className={`w-full rounded-lg border p-4 text-left transition ${
+                    item.name === exportName
+                      ? 'border-[#45b9a8]/50 bg-[#45b9a8]/10'
+                      : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]'
+                  }`}
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-sm font-black text-white">{item.label}</div>
+                      <div className="mt-1 truncate text-xs font-semibold text-slate-500">{item.name}</div>
+                    </div>
+                    {item.name === exportName && (
+                      <span className="rounded-md bg-[#45b9a8] px-2 py-1 text-xs font-black text-black">Active</span>
+                    )}
+                  </div>
+                  <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-400 sm:grid-cols-4">
+                    <div><span className="block text-slate-600">Holder</span>{item.holder_name || 'Unknown'}</div>
+                    <div><span className="block text-slate-600">Broker</span>{item.broker || 'Unknown'}</div>
+                    <div><span className="block text-slate-600">Range</span>{item.first_date && item.last_date ? `${item.first_date} - ${item.last_date}` : 'Unknown'}</div>
+                    <div><span className="block text-slate-600">Rows</span>{item.transaction_count.toLocaleString()}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
       {authPromptOpen && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 px-5 backdrop-blur-sm"

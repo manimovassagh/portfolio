@@ -46,11 +46,11 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
   const [positionRange, setPositionRange] = useState<PositionRangeOption>('Max');
 
   type BenchmarkOption = { label: string; ticker: string };
-  const benchmarkOptions: BenchmarkOption[] = [
-    { label: 'None',      ticker: '' },
+  const benchmarkOptions = useMemo<BenchmarkOption[]>(() => [
+    { label: 'None',       ticker: '' },
     { label: 'MSCI World', ticker: 'URTH' },
-    { label: 'S&P 500',   ticker: 'CSPX.L' },
-  ];
+    { label: 'S&P 500',    ticker: 'CSPX.L' },
+  ], []);
   const [benchmarkTicker, setBenchmarkTicker] = useState<string>('URTH');
   const [benchmarkPoints, setBenchmarkPoints] = useState<BenchmarkPoint[] | null>(data.perf.benchmark);
 
@@ -240,6 +240,41 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
       },
     },
   }), [allocationHoldings, openAsset, t]);
+  const healthChecks = useMemo(() => {
+    const top3Weight = topHoldings.slice(0, 3).reduce((sum, holding) => sum + (holding.weight || 0), 0);
+    const cashWeight = s.portfolio_value > 0 ? (s.cash_balance / s.portfolio_value) * 100 : 0;
+    const totalCosts = Math.max(0, -(s.fees + s.tax));
+    const lastTwr = perfWithBenchmark.twr.at(-1)?.twr ?? null;
+    const lastBenchmark = perfWithBenchmark.benchmark?.at(-1)?.twr ?? null;
+    const benchmarkGap = lastTwr !== null && lastBenchmark !== null ? lastTwr - lastBenchmark : null;
+
+    return [
+      {
+        label: 'Concentration',
+        value: `${top3Weight.toFixed(1)}%`,
+        detail: 'Top 3 positions',
+        tone: top3Weight > 60 ? 'warn' : 'good',
+      },
+      {
+        label: 'Cash drag',
+        value: `${cashWeight.toFixed(1)}%`,
+        detail: fmtEUR(s.cash_balance),
+        tone: cashWeight > 15 ? 'warn' : 'good',
+      },
+      {
+        label: 'Cost drag',
+        value: fmtEUR(totalCosts),
+        detail: 'Fees and tax in CSV',
+        tone: totalCosts > 100 ? 'warn' : 'neutral',
+      },
+      {
+        label: 'Benchmark gap',
+        value: benchmarkGap === null ? '—' : pct(benchmarkGap),
+        detail: benchmarkOptions.find((o) => o.ticker === benchmarkTicker)?.label || 'Benchmark',
+        tone: benchmarkGap === null ? 'neutral' : benchmarkGap >= 0 ? 'good' : 'warn',
+      },
+    ];
+  }, [benchmarkOptions, benchmarkTicker, perfWithBenchmark.benchmark, perfWithBenchmark.twr, s.cash_balance, s.fees, s.portfolio_value, s.tax, topHoldings]);
 
   return (
     <section className="space-y-7">
@@ -441,6 +476,29 @@ export function Overview({ data, dark, chartMode, openAsset, navigate }: Overvie
           </div>
         </Card>
       </div>
+
+      <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-black">Portfolio health check</h2>
+            <div className="mt-1 text-sm font-bold text-slate-500">Fast signals for risk, cash, costs, and benchmark context</div>
+          </div>
+          <button onClick={() => navigate('rebalance')} className="inline-flex h-9 items-center gap-2 rounded-md bg-white px-3 text-sm font-black text-black hover:bg-slate-100">
+            Rebalance <ChevronRight size={16} />
+          </button>
+        </div>
+        <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {healthChecks.map((item) => (
+            <div key={item.label} className="rounded-lg bg-white/[0.04] p-4">
+              <div className="text-xs font-black uppercase tracking-wide text-slate-500">{item.label}</div>
+              <div className={`num mt-3 text-2xl font-black ${
+                item.tone === 'good' ? 'text-[#6ee787]' : item.tone === 'warn' ? 'text-amber-400' : 'text-white'
+              }`}>{item.value}</div>
+              <div className="mt-1 text-sm font-semibold text-slate-500">{item.detail}</div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       <Card className="rounded-lg !border-[#303030] !bg-[#202020] p-5 text-white shadow-none">
         <div className="flex flex-wrap items-center justify-between gap-3">

@@ -149,6 +149,16 @@ export const AnalyticsSchema = z.object({
 
 export const ExportsPayloadSchema = z.object({
   exports: z.array(z.string()),
+  export_infos: z.array(z.object({
+    name: z.string(),
+    label: z.string(),
+    holder_name: nullableString,
+    broker: nullableString,
+    imported_at: nullableString,
+    first_date: nullableString,
+    last_date: nullableString,
+    transaction_count: z.number(),
+  })).optional(),
 });
 
 // ── AssetDetail ───────────────────────────────────────────────────────────────
