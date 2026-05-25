@@ -122,8 +122,11 @@ export default function App() {
 
   const livePrices = useLivePrices(exportName || null);
   const activeExportInfo = exportInfos.find((item) => item.name === exportName) ?? null;
-  const exportLabel = useCallback((name: string) => {
-    return exportInfos.find((item) => item.name === name)?.label || name;
+  const compactExportLabel = useCallback((name: string) => {
+    const info = exportInfos.find((item) => item.name === name);
+    if (!info) return name;
+    const month = info.last_date?.slice(0, 7);
+    return [info.broker, month].filter(Boolean).join(' · ') || info.name;
   }, [exportInfos]);
 
   useEffect(() => {
@@ -384,9 +387,7 @@ export default function App() {
   const accountName  = authSession?.user?.name || holderName;
   const initials     = accountName?.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
   const currentLabel = sections.find((s) => s.id === active)?.label || 'Overview';
-  const pageTitle = active === 'overview' && holderName
-    ? `Overview of ${holderName}'s ${activeBroker} account`
-    : currentLabel;
+  const accountContext = holderName ? `${holderName} · ${activeBroker}` : activeBroker;
   const market = marketStatus(lastUpdated || new Date());
   const routeContent = useMemo(() => {
     if (!data) return null;
@@ -526,11 +527,11 @@ export default function App() {
                     aria-label="Selected export"
                     value={exportName}
                     onChange={(e) => refresh(e.target.value)}
-                    className="hidden h-10 rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm md:block dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-100"
+                    className="hidden h-10 max-w-[220px] rounded-md border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 shadow-sm md:block lg:max-w-[260px] dark:border-[#3a3a3a] dark:bg-[#303030] dark:text-slate-100"
                     disabled={loading}
                   >
                     <option value="all">All (merged)</option>
-                    {exports.map((item) => <option key={item} value={item}>{exportLabel(item)}</option>)}
+                    {exports.map((item) => <option key={item} value={item}>{compactExportLabel(item)}</option>)}
                   </select>
                 )}
                 {authenticated && exports.length > 0 && (
@@ -640,7 +641,12 @@ export default function App() {
             <div className="flex items-end justify-between gap-4">
               <div>
                 <div className="text-sm font-semibold text-slate-500 dark:text-slate-500">Net worth / Investments / Trade Republic</div>
-                <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{pageTitle}</h1>
+                <h1 className="mt-2 text-2xl font-black tracking-tight text-slate-950 dark:text-white">{currentLabel}</h1>
+                {active === 'overview' && (
+                  <div className="mt-2 inline-flex max-w-full rounded-md border border-slate-200 bg-white px-2.5 py-1 text-xs font-black text-slate-500 shadow-sm dark:border-[#303030] dark:bg-[#202020] dark:text-slate-400">
+                    <span className="truncate">{accountContext}</span>
+                  </div>
+                )}
               </div>
               <div className="flex flex-col items-end gap-2 text-right text-sm text-slate-500">
                 <span className={`rounded-md border px-2.5 py-1 text-xs font-black uppercase tracking-wide ${
