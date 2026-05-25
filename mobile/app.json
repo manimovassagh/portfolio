@@ -21,6 +21,12 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "29a66f48-9719-4f65-9629-b88ccbef5611"
+      }
+    },
+    "owner": "mani_mgh"
   }
 }
