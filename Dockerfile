@@ -24,7 +24,7 @@ RUN cd backend && CGO_ENABLED=0 go build -o /kapital ./cmd/api
 
 FROM ghcr.io/astral-sh/uv:0.7.9 AS uv-binary
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 WORKDIR /app
 
 RUN apt-get update \
