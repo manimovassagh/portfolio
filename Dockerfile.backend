@@ -5,7 +5,7 @@ RUN cd backend && go mod download
 COPY backend/ ./backend/
 RUN cd backend && CGO_ENABLED=0 go build -o /kapital ./cmd/api
 
-FROM alpine:3.21
+FROM alpine:3.23
 RUN apk add --no-cache ca-certificates wget
 COPY --from=builder /kapital /kapital
 WORKDIR /app
